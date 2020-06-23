@@ -63,7 +63,7 @@ class ChainDataAggregator {
     await RewardedEvent.insertMany(flattenedRewardedEvents);
 
     const rewardedEvents = await RewardedEvent.find();
-    const rewardValues = rewardedEvents.map(event => event.amount);
+    const rewardValues = rewardedEvents.map(event => new BN(event.amount));
     const totalRewards = rewardValues.reduce((a, b) => a.add(b), new BN('0'));
     return totalRewards;
   }
@@ -97,13 +97,13 @@ class ChainDataAggregator {
   }
 
   async syncTotalCoverPurchases(fromBlock) {
-    const newCoverDetailsEvents = this.getCoverDetailsEvents(fromBlock);
+    const newCoverDetailsEvents = await this.getCoverDetailsEvents(fromBlock);
     log.info(`Detected ${newCoverDetailsEvents.length} new events.`);
     const flattenedCoverDetailsEvents = newCoverDetailsEvents.map(flattenEvent);
     await CoverDetailsEvent.insertMany(flattenedCoverDetailsEvents);
 
     const coverDetailsEvents = await CoverDetailsEvent.find();
-    const premiumNXMValues = coverDetailsEvents.map(event => event.premiumNXM);
+    const premiumNXMValues = coverDetailsEvents.map(event => new BN(event.premiumNXM));
     const totalNXMCoverPurchaseValue = premiumNXMValues.reduce((a, b) => a.add(b), new BN('0'));
     return totalNXMCoverPurchaseValue;
   }
