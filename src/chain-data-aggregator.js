@@ -1,5 +1,4 @@
 const Web3 = require('web3');
-const abiDecoder = require('abi-decoder');
 const log = require('./log');
 const { hex } = require('./utils');
 
@@ -7,6 +6,8 @@ const OverallAggregatedStats = require('./models/overall-aggregated-stats');
 const StakedEvent = require('./models/staked-event');
 const RewardedEvent = require('./models/rewarded-event');
 const CoverDetailsEvent = require('./models/cover-details-event');
+const DailyStakerDeposit = require('./models/daily-staker-deposit');
+const { chunk } = require('./utils');
 
 const BN = new Web3().utils.BN;
 
@@ -15,11 +16,23 @@ class ChainDataAggregator {
     this.versionData = versionData;
   }
 
-  async init() {
-    log.info(`Loading ABIs in abiDecoder..`);
-    for (const abi of this.versionData.getABIList()) {
-      abiDecoder.addABI(abi.contractAbi);
-    }
+  async getOverallAggregatedStats() {
+    return await OverallAggregatedStats.findOne();
+  }
+
+  async getMemberAggregatedStats(member) {
+    const pooledStaking = this.versionData.instance('PS');
+    const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
+      filter: {
+        staker: member,
+      }
+    })
+
+    const withdrawAmounts = rewardWithdrawnEvents.map(event => event.returnValues.amount);
+    const totalWithdrawnAmounts = withdrawAmounts.reduce((a, b) => a.add(b), new BN('0'));
+    const currentReward = await pooledStaking.stakerReward(member);
+    const totalRewards = totalWithdrawnAmounts.add(currentReward).toString();
+    return { totalRewards };
   }
 
   async syncOverallAggregateStats() {
@@ -47,11 +60,7 @@ class ChainDataAggregator {
       latestBlockProcessed
     };
     log.info(`Storing OverallAggregatedStats values: ${JSON.stringify(newValues)}`);
-    if (!aggregatedStats) {
-      await OverallAggregatedStats.create(newValues);
-    } else {
-      await OverallAggregatedStats.update({ _id: aggregatedStats._id }, newValues);
-    }
+    await OverallAggregatedStats.updateOne({}, newValues, { upsert: true });
   }
 
   async syncTotalRewards(fromBlock) {
@@ -109,6 +118,44 @@ class ChainDataAggregator {
   }
 
 
+  async syncDailyStakerDeposits() {
+    log.info(`Syncing daily staker deposits..`);
+    const allStakedEvents = await StakedEvent.find();
+    const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
+    log.info(`There are ${allStakers.length} stakers to sync.`);
+    const chunkSize = 50;
+    const chunks = chunk(allStakers, chunkSize);
+    log.info(`To be processed in ${chunks.length} of max size ${chunkSize}`);
+
+    const pooledStaking = this.versionData.instance('PS');
+    const allStakerDeposits = [];
+    for (const chunk of chunks) {
+      const stakerDeposits = await Promise.all(chunk.map(async staker => {
+        const deposit = await pooledStaking.stakerDeposit(staker);
+        return { staker, deposit };
+      }));
+      allStakerDeposits.push(...stakerDeposits);
+    }
+
+    const today = new Date();
+    // normalize to midnight
+    today.setHours(0, 0, 0, 0);
+    const dailyStakerDepositRecords = allStakerDeposits.map(({ staker, deposit}) => {
+      return { address: staker, deposit: deposit.toString(), date: today.toISOString() };
+    });
+
+    log.info(`Storing ${dailyStakerDepositRecords.length} daily staker deposits.`);
+
+    try {
+      await DailyStakerDeposit.insertMany(dailyStakerDepositRecords, { ordered: false });
+    } catch (e) {
+      // ignore duplicate errors with code 11000
+      if (e.code !== 11000) {
+        throw e;
+      }
+    }
+  }
+
   async getContractStake(contractAddress) {
     const pooledStaking = this.versionData.instance('PS');
     const stake = await pooledStaking.contractStake(contractAddress);
@@ -143,10 +190,6 @@ class ChainDataAggregator {
     const mcr = this.versionData.instance('MC');
     const tokenPrice = mcr.calculateTokenPrice(hex(currency));
     return tokenPrice;
-  }
-
-  async getOverallAggregatedStats() {
-    return await OverallAggregatedStats.findOne();
   }
 }
 

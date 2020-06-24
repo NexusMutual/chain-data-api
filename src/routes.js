@@ -29,12 +29,20 @@ module.exports = (chainDataAggregator) => {
   app.get('/stats/overall', asyncRoute(async (req, res) => {
 
     const { totalStaked, coverPurchased, totalRewards, averageReturns } = await chainDataAggregator.getOverallAggregatedStats();
-
     res.json({
       totalStaked,
       coverPurchased,
       totalRewards,
       averageReturns
+    });
+  }));
+
+  app.get('/stats/:member', asyncRoute(async (req, res) => {
+
+    const { totalRewards, annualizedReturns } = await chainDataAggregator.getMemberAggregatedStats(req.params.member);
+    res.json({
+      totalRewards,
+      annualizedReturns
     });
   }));
 
