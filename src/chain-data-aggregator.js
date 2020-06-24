@@ -6,7 +6,7 @@ const OverallAggregatedStats = require('./models/overall-aggregated-stats');
 const StakedEvent = require('./models/staked-event');
 const RewardedEvent = require('./models/rewarded-event');
 const CoverDetailsEvent = require('./models/cover-details-event');
-const DailyStakerDeposit = require('./models/daily-staker-deposit');
+const DailyStakerData = require('./models/daily-staker-data');
 const { chunk } = require('./utils');
 
 const BN = new Web3().utils.BN;
@@ -118,7 +118,7 @@ class ChainDataAggregator {
   }
 
 
-  async syncDailyStakerDeposits() {
+  async syncDailyStakerData() {
     log.info(`Syncing daily staker deposits..`);
     const allStakedEvents = await StakedEvent.find();
     const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
@@ -128,26 +128,29 @@ class ChainDataAggregator {
     log.info(`To be processed in ${chunks.length} of max size ${chunkSize}`);
 
     const pooledStaking = this.versionData.instance('PS');
-    const allStakerDeposits = [];
+    const allStakerData = [];
     for (const chunk of chunks) {
-      const stakerDeposits = await Promise.all(chunk.map(async staker => {
-        const deposit = await pooledStaking.stakerDeposit(staker);
-        return { staker, deposit };
+      const stakerData = await Promise.all(chunk.map(async staker => {
+        const [deposit, reward] = await Promise.all([
+          pooledStaking.stakerDeposit(staker),
+          pooledStaking.stakerReward(staker)
+        ]);
+        return { staker, deposit, reward };
       }));
-      allStakerDeposits.push(...stakerDeposits);
+      allStakerData.push(...stakerData);
     }
 
     const today = new Date();
     // normalize to midnight
     today.setHours(0, 0, 0, 0);
-    const dailyStakerDepositRecords = allStakerDeposits.map(({ staker, deposit}) => {
+    const dailyStakerDataRecords = allStakerData.map(({ staker, deposit}) => {
       return { address: staker, deposit: deposit.toString(), date: today.toISOString() };
     });
 
-    log.info(`Storing ${dailyStakerDepositRecords.length} daily staker deposits.`);
+    log.info(`Storing ${dailyStakerDataRecords.length} daily staker deposits.`);
 
     try {
-      await DailyStakerDeposit.insertMany(dailyStakerDepositRecords, { ordered: false });
+      await DailyStakerData.insertMany(dailyStakerDataRecords, { ordered: false });
     } catch (e) {
       // ignore duplicate errors with code 11000
       if (e.code !== 11000) {
