@@ -6,14 +6,14 @@ const { setupLoader } = require('@openzeppelin/contract-loader');
 
 class VersionData {
 
-  constructor (chain = 'mainnet', versionDataURL, providerURL) {
+  constructor (chain, versionDataURL, providerURL) {
     this.chain = chain;
     this.versionDataURL = versionDataURL;
     this.providerURL = providerURL;
   }
 
   async init () {
-    log.info(`Fetching version data from ${this.versionDataURL}`);
+    log.info(`Fetching version data from ${this.versionDataURL} for chain ${this.chain}`);
     const data = await fetch(this.versionDataURL).then(res => res.json());
 
     if (typeof data[this.chain] === 'undefined') {

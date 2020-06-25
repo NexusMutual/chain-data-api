@@ -31,8 +31,9 @@ async function init () {
   const overallStatsSyncInterval = getEnv('OVERALL_STATS_SYNC_INTERVAL');
   const stakerDataSyncInterval = getEnv('STAKER_DATA_SYNC_INTERVAL');
   const syncFailureRetryInterval = getEnv('SYNC_FAILURE_INTERVAL');
+  const chainName = getEnv('CHAIN_NAME', 'mainnet');
 
-  const versionData = new VersionData(null, versionDataURL, providerURL);
+  const versionData = new VersionData(chainName, versionDataURL, providerURL);
 
   await versionData.init();
 

@@ -74,7 +74,7 @@ class ChainDataAggregator {
       this.syncTotalStaked(fromBlock),
       this.syncTotalCoverPurchases(fromBlock),
     ]);
-    const averageReturns = await this.computeAverageReturns();
+    const averageReturns = await this.computeOverallAverageReturns();
     const newValues = {
       totalStaked: totalStaked.toString(),
       totalRewards: totalRewards.toString(),
@@ -87,7 +87,7 @@ class ChainDataAggregator {
     await OverallAggregatedStats.updateOne({}, newValues, { upsert: true });
   }
 
-  async computeAverageReturns () {
+  async computeOverallAverageReturns () {
 
     const startTimestamp = (new Date().getTime() - this.annualizedReturnsMinDays * 24 * 60 * 60 * 1000) / 1000;
     log.info(`Computing averageReturns starting with rewards from ${new Date(startTimestamp).toISOString()}`);
@@ -181,6 +181,7 @@ class ChainDataAggregator {
   }
 
   async syncDailyStakerData () {
+
     log.info(`Syncing daily staker deposits..`);
     const allStakedEvents = await StakedEvent.find();
     const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
@@ -268,6 +269,7 @@ function flattenEvent (event) {
 }
 
 function stakerAnnualizedReturns (latestData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval) {
+
   if (latestData.length === 0) {
     return undefined;
   }
