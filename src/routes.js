@@ -29,6 +29,8 @@ module.exports = (chainDataAggregator) => {
   app.get('/stats/overall', asyncRoute(async (req, res) => {
 
     const { totalStaked, coverPurchased, totalRewards, averageReturns } = await chainDataAggregator.getOverallAggregatedStats();
+
+    // TODO: covert to USD using the DAI NXM price
     res.json({
       totalStaked,
       coverPurchased,
