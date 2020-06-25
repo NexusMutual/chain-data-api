@@ -62,7 +62,7 @@ class ChainDataAggregator {
     if (!aggregatedStats) {
       fromBlock = 0;
     } else {
-      fromBlock = aggregatedStats.lastBlockProcessed + 1;
+      fromBlock = aggregatedStats.latestBlockProcessed + 1;
     }
     log.info(`Computing overall aggregated stats from block ${fromBlock}`);
     const latestBlockProcessed = await this.versionData.web3.eth.getBlockNumber();
@@ -72,16 +72,51 @@ class ChainDataAggregator {
       this.syncTotalRewards(fromBlock),
       this.syncTotalStaked(fromBlock),
       this.syncTotalCoverPurchases(fromBlock),
-    ])
-
+    ]);
+    const averageReturns = await this.computeAverageReturns();
     const newValues = {
       totalStaked: totalStaked.toString(),
       totalRewards: totalRewards.toString(),
       coverPurchased: coverPurchased.toString(),
+      averageReturns,
       latestBlockProcessed
     };
+
     log.info(`Storing OverallAggregatedStats values: ${JSON.stringify(newValues)}`);
     await OverallAggregatedStats.updateOne({}, newValues, { upsert: true });
+  }
+
+  async computeAverageReturns() {
+
+    const startTimestamp = (new Date().getTime() - this.annualizedReturnsMinDays * 24 * 60 * 60 * 1000) / 1000;
+    log.info(`Computing averageReturns starting with rewards from ${new Date(startTimestamp).toISOString()}`);
+    const latestRewardedEvents = await RewardedEvent
+      .find()
+      .where('timestamp').gt(startTimestamp);
+
+    const latestRewards = latestRewardedEvents.map(event => new BN(event.amount));
+    const totalLatestReward = latestRewards.reduce((a, b) => a.add(b), new BN('0'));
+
+    const latest = await DailyStakerData
+      .findOne()
+      .sort({ timestamp: -1 });
+
+    if (!latest) {
+      return undefined;
+    }
+
+    const latestTimestamp = latest.timestamp;
+    const dailyStakerDataForLastDay = await DailyStakerData
+      .find()
+      .sort({ timestamp: -1 })
+      .where('timestamp').eq(latestTimestamp);
+
+    const currentOverallDeposit = dailyStakerDataForLastDay
+      .map(data => new BN(data.deposit))
+      .reduce((a, b) => a.add(b), new BN('0'));
+
+    const averageReturns = parseInt(totalLatestReward.toString()) / parseInt(currentOverallDeposit.toString());
+    return averageReturns;
   }
 
   async syncTotalRewards(fromBlock) {
@@ -90,6 +125,12 @@ class ChainDataAggregator {
     const newRewardedEvents = await this.getRewardedEvents(fromBlock);
     log.info(`Detected ${newRewardedEvents.length} new events.`);
     const flattenedRewardedEvents = newRewardedEvents.map(flattenEvent);
+
+    await Promise.all(flattenedRewardedEvents.map(async event => {
+      const block = await this.versionData.web3.eth.getBlock(event.blockNumber);
+      event.timestamp = block.timestamp;
+    }));
+
     await RewardedEvent.insertMany(flattenedRewardedEvents);
 
     const rewardedEvents = await RewardedEvent.find();
@@ -137,7 +178,6 @@ class ChainDataAggregator {
     const totalNXMCoverPurchaseValue = premiumNXMValues.reduce((a, b) => a.add(b), new BN('0'));
     return totalNXMCoverPurchaseValue;
   }
-
 
   async syncDailyStakerData() {
     log.info(`Syncing daily staker deposits..`);
@@ -222,19 +262,6 @@ class ChainDataAggregator {
   }
 }
 
-async function runForever(f, interval, errorInterval) {
-  log.info(`Running forever with interval = ${interval}, errorInterval = ${errorInterval}, startDelay = ${startDelay}`);
-  while (true) {
-    try {
-      await f();
-      await sleep(interval);
-    } catch (e) {
-      log.error(`Failed with ${e.stack}. Restarting in ${errorInterval} ms.`);
-      await sleep(errorInterval);
-    }
-  }
-}
-
 function flattenEvent(event) {
   return { ...event, ...event.returnValues }
 }
@@ -258,6 +285,10 @@ function stakerAnnualizedReturns(latestData, currentReward, rewardWithdrawnEvent
 
   const exponent = 365 / annualizedDaysInterval;
 
+  /**
+   *  (sumOfRewardsPerInterval / averageDeposit + 1) ^ ( 365 / annualizedDaysInterval) -1;
+   * @type {number}
+   */
   const annualizedReturns = (parseInt(sumOfRewardsPerInterval.toString()) / parseInt(averageDeposit.toString()) + 1) ** exponent - 1;
   return annualizedReturns;
 }

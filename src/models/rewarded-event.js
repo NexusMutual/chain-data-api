@@ -7,6 +7,7 @@ const rewardedEventSchema = new mongoose.Schema({
   logIndex: { type: Number },
   transactionHash: { type: String },
 
+  timestamp: { type: Number },
   amount: { type: String },
   contractAddress: { type: String },
 })

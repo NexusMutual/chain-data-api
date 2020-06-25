@@ -4,16 +4,12 @@ const log = require('./log')
 
 const { setupLoader } = require('@openzeppelin/contract-loader');
 
-const {
-  PROVIDER_URL,
-  VERSION_DATA_URL,
-} = process.env;
-
 class VersionData {
 
-  constructor (chain = 'mainnet', versionDataURL = VERSION_DATA_URL) {
+  constructor (chain = 'mainnet', versionDataURL, providerURL) {
     this.chain = chain;
     this.versionDataURL = versionDataURL;
+    this.providerURL = providerURL;
   }
 
   async init () {
@@ -26,7 +22,7 @@ class VersionData {
 
     this.data = data[this.chain].abis
       .reduce((data, abi) => ({ ...data, [abi.code]: {...abi, contractAbi: JSON.parse(abi.contractAbi) } }), {});
-    const web3 = new Web3(PROVIDER_URL);
+    const web3 = new Web3(this.providerURL);
     this.web3 = web3;
 
     this.loader = setupLoader({
