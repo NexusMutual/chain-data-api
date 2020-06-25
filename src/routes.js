@@ -39,8 +39,8 @@ module.exports = (chainDataAggregator) => {
 
   app.get('/stats/:member', asyncRoute(async (req, res) => {
     const days = parseInt(req.query.days);
-    if (days < 7 || days > 30) {
-      const errMessage = `days parameter needs to be between 7 and 30`;
+    if (days < 1 || days > 30) {
+      const errMessage = `days parameter needs to be between 1 and 30`;
       log.error(errMessage);
       return res.status(400).json({ message: errMessage });
     }

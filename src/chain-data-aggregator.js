@@ -12,8 +12,9 @@ const { chunk } = require('./utils');
 const BN = new Web3().utils.BN;
 
 class ChainDataAggregator {
-  constructor(versionData) {
+  constructor(versionData, annualizedReturnsMinDays) {
     this.versionData = versionData;
+    this.annualizedReturnsMinDays = annualizedReturnsMinDays;
   }
 
   async getOverallAggregatedStats() {
@@ -45,7 +46,13 @@ class ChainDataAggregator {
         .limit(annualizedDaysInterval);
 
     dailyStakerData.reverse();
-    const annualizedReturns = stakerAnnualizedReturns(dailyStakerData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval);
+    let annualizedReturns = undefined;
+    if (dailyStakerData.length >= this.annualizedReturnsMinDays) {
+      annualizedReturns = stakerAnnualizedReturns(dailyStakerData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval);
+    } else {
+      log.warn(`Insufficient ${dailyStakerData.length} data points to compute annualized returns for member ${member}. Required: ${this.annualizedReturnsMinDays}`);
+    }
+
     return { totalRewards, annualizedReturns };
   }
 
