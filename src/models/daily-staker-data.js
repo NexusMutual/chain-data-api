@@ -5,8 +5,8 @@ const dailyStakerData = new mongoose.Schema({
   deposit: { type: String },
   reward: { type: String },
   timestamp: { type: Number },
-  fetchedDate: { type: String }
-})
+  fetchedDate: { type: String },
+});
 
 dailyStakerData.index({ address: 1, timestamp: 1 }, { unique: true });
 

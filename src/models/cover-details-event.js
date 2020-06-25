@@ -13,8 +13,8 @@ const coverDetailsEventSchema = new mongoose.Schema({
   expiry: String,
   premium: String,
   premiumNXM: String,
-  curr: String
-})
+  curr: String,
+});
 
 coverDetailsEventSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
 

@@ -12,27 +12,28 @@ const { chunk } = require('./utils');
 const BN = new Web3().utils.BN;
 
 class ChainDataAggregator {
-  constructor(versionData, annualizedReturnsMinDays) {
+  constructor (versionData, annualizedReturnsMinDays) {
     this.versionData = versionData;
     this.annualizedReturnsMinDays = annualizedReturnsMinDays;
   }
 
-  async getOverallAggregatedStats() {
-    return await OverallAggregatedStats.findOne();
+  async getOverallAggregatedStats () {
+    const overallAggregatedStats = await OverallAggregatedStats.findOne();
+    return overallAggregatedStats;
   }
 
-  async getMemberAggregatedStats(member, annualizedDaysInterval) {
+  async getMemberAggregatedStats (member, annualizedDaysInterval) {
     const pooledStaking = this.versionData.instance('PS');
     const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
       filter: {
         staker: member,
-      }
+      },
     });
 
     // TODO: not efficient to fetch these blocks everytime
     await Promise.all(rewardWithdrawnEvents.map(async event => {
-       const block = await this.versionData.web3.eth.getBlock(event.blockNumber);
-       event.timestamp = block.timestamp;
+      const block = await this.versionData.web3.eth.getBlock(event.blockNumber);
+      event.timestamp = block.timestamp;
     }));
 
     const withdrawAmounts = rewardWithdrawnEvents.map(event => new BN(event.returnValues.amount));
@@ -41,12 +42,12 @@ class ChainDataAggregator {
     const totalRewards = totalWithdrawnAmounts.add(currentReward).toString();
 
     const dailyStakerData = await DailyStakerData
-        .find({ address: member })
-        .sort({ timestamp: -1 })
-        .limit(annualizedDaysInterval);
+      .find({ address: member })
+      .sort({ timestamp: -1 })
+      .limit(annualizedDaysInterval);
 
     dailyStakerData.reverse();
-    let annualizedReturns = undefined;
+    let annualizedReturns;
     if (dailyStakerData.length >= this.annualizedReturnsMinDays) {
       annualizedReturns = stakerAnnualizedReturns(dailyStakerData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval);
     } else {
@@ -56,7 +57,7 @@ class ChainDataAggregator {
     return { totalRewards, annualizedReturns };
   }
 
-  async syncOverallAggregateStats() {
+  async syncOverallAggregateStats () {
     const aggregatedStats = await OverallAggregatedStats.findOne();
     let fromBlock;
     if (!aggregatedStats) {
@@ -68,7 +69,7 @@ class ChainDataAggregator {
     const latestBlockProcessed = await this.versionData.web3.eth.getBlockNumber();
     log.info(`Latest block being processed: ${latestBlockProcessed}`);
 
-    const [totalRewards, totalStaked, coverPurchased ] = await Promise.all([
+    const [totalRewards, totalStaked, coverPurchased] = await Promise.all([
       this.syncTotalRewards(fromBlock),
       this.syncTotalStaked(fromBlock),
       this.syncTotalCoverPurchases(fromBlock),
@@ -79,14 +80,14 @@ class ChainDataAggregator {
       totalRewards: totalRewards.toString(),
       coverPurchased: coverPurchased.toString(),
       averageReturns,
-      latestBlockProcessed
+      latestBlockProcessed,
     };
 
     log.info(`Storing OverallAggregatedStats values: ${JSON.stringify(newValues)}`);
     await OverallAggregatedStats.updateOne({}, newValues, { upsert: true });
   }
 
-  async computeAverageReturns() {
+  async computeAverageReturns () {
 
     const startTimestamp = (new Date().getTime() - this.annualizedReturnsMinDays * 24 * 60 * 60 * 1000) / 1000;
     log.info(`Computing averageReturns starting with rewards from ${new Date(startTimestamp).toISOString()}`);
@@ -119,7 +120,7 @@ class ChainDataAggregator {
     return averageReturns;
   }
 
-  async syncTotalRewards(fromBlock) {
+  async syncTotalRewards (fromBlock) {
 
     log.info(`Syncing Rewarded events..`);
     const newRewardedEvents = await this.getRewardedEvents(fromBlock);
@@ -139,7 +140,7 @@ class ChainDataAggregator {
     return totalRewards;
   }
 
-  async syncTotalStaked(fromBlock) {
+  async syncTotalStaked (fromBlock) {
 
     log.info(`Syncing Staked events..`);
     const newStakedEvents = await this.getStakedEvents(fromBlock);
@@ -153,10 +154,10 @@ class ChainDataAggregator {
       contractSet.add(stakedEvent.contractAddress);
     }
     const contractList = Array.from(contractSet);
-    log.info(`A set of ${contractList.length} contracts currently have stakes.`)
+    log.info(`A set of ${contractList.length} contracts currently have stakes.`);
     const contractStakes = await Promise.all(contractList.map(contractAddress => {
       try {
-        return this.getContractStake(contractAddress)
+        return this.getContractStake(contractAddress);
       } catch (e) {
         log.error(`Failed to fetch contractStake for ${contractAddress}`);
         throw e;
@@ -167,7 +168,7 @@ class ChainDataAggregator {
     return totalStaked;
   }
 
-  async syncTotalCoverPurchases(fromBlock) {
+  async syncTotalCoverPurchases (fromBlock) {
     const newCoverDetailsEvents = await this.getCoverDetailsEvents(fromBlock);
     log.info(`Detected ${newCoverDetailsEvents.length} new events.`);
     const flattenedCoverDetailsEvents = newCoverDetailsEvents.map(flattenEvent);
@@ -179,7 +180,7 @@ class ChainDataAggregator {
     return totalNXMCoverPurchaseValue;
   }
 
-  async syncDailyStakerData() {
+  async syncDailyStakerData () {
     log.info(`Syncing daily staker deposits..`);
     const allStakedEvents = await StakedEvent.find();
     const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
@@ -194,7 +195,7 @@ class ChainDataAggregator {
       const stakerData = await Promise.all(chunk.map(async staker => {
         const [deposit, reward] = await Promise.all([
           pooledStaking.stakerDeposit(staker),
-          pooledStaking.stakerReward(staker)
+          pooledStaking.stakerReward(staker),
         ]);
         return { staker, deposit, reward };
       }));
@@ -225,48 +226,48 @@ class ChainDataAggregator {
     }
   }
 
-  async getContractStake(contractAddress) {
+  async getContractStake (contractAddress) {
     const pooledStaking = this.versionData.instance('PS');
     const stake = await pooledStaking.contractStake(contractAddress);
     return stake;
   }
 
-  async getStakedEvents(fromBlock) {
+  async getStakedEvents (fromBlock) {
     const pooledStaking = this.versionData.instance('PS');
     const stakedEvents = await pooledStaking.getPastEvents('Staked', {
-      fromBlock
+      fromBlock,
     });
     return stakedEvents;
   }
 
-  async getRewardedEvents(fromBlock) {
+  async getRewardedEvents (fromBlock) {
     const pooledStaking = this.versionData.instance('PS');
     const rewardedEvents = await pooledStaking.getPastEvents('Rewarded', {
-      fromBlock
+      fromBlock,
     });
     return rewardedEvents;
   }
 
-  async getCoverDetailsEvents(fromBlock) {
+  async getCoverDetailsEvents (fromBlock) {
     const quotationData = this.versionData.instance('QD');
     const coverDetailsEvents = await quotationData.getPastEvents('CoverDetailsEvent', {
-      fromBlock
-    })
+      fromBlock,
+    });
     return coverDetailsEvents;
   }
 
-  async getCurrentTokenPrice(currency) {
+  async getCurrentTokenPrice (currency) {
     const mcr = this.versionData.instance('MC');
     const tokenPrice = mcr.calculateTokenPrice(hex(currency));
     return tokenPrice;
   }
 }
 
-function flattenEvent(event) {
-  return { ...event, ...event.returnValues }
+function flattenEvent (event) {
+  return { ...event, ...event.returnValues };
 }
 
-function stakerAnnualizedReturns(latestData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval) {
+function stakerAnnualizedReturns (latestData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval) {
   if (latestData.length === 0) {
     return undefined;
   }
@@ -277,7 +278,7 @@ function stakerAnnualizedReturns(latestData, currentReward, rewardWithdrawnEvent
     .filter(rewardEvent => rewardEvent.timestamp * 1000 >= startTime)
     .map(event => new BN(event.returnValues.amount));
 
-  let storedRewardDifference = currentReward.sub(new BN(firstStakerData.reward));
+  const storedRewardDifference = currentReward.sub(new BN(firstStakerData.reward));
   const sumOfRewardsPerInterval = rewardsPostStartTime.reduce((a, b) => a.add(b), storedRewardDifference);
   const averageDeposit = latestData
     .map(stakerData => new BN(stakerData.deposit))
@@ -293,5 +294,4 @@ function stakerAnnualizedReturns(latestData, currentReward, rewardWithdrawnEvent
   return annualizedReturns;
 }
 
-
-module.exports = ChainDataAggregator
+module.exports = ChainDataAggregator;

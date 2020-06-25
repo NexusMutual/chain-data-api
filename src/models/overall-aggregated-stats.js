@@ -5,6 +5,6 @@ const overallAggregatedStatsSchema = new mongoose.Schema({
   coverPurchased: String,
   totalRewards: String,
   averageReturns: String,
-  latestBlockProcessed: Number
-})
+  latestBlockProcessed: Number,
+});
 module.exports = mongoose.model('OverallAggregatedStats', overallAggregatedStatsSchema);

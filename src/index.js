@@ -42,7 +42,6 @@ async function init () {
   log.info(`Chain-api listening on port ${PORT}`);
   log.info(`Launching regular data sync processes..`);
 
-
   runForever(chainDataAggregator.syncOverallAggregateStats, overallStatsSyncInterval, syncFailureRetryInterval, 0);
 
   const syncDailyDelay = 10000;

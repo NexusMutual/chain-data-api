@@ -10,7 +10,7 @@ const stakedEventSchema = new mongoose.Schema({
   amount: { type: String },
   contractAddress: { type: String },
   staker: { type: String },
-})
+});
 
 stakedEventSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
 

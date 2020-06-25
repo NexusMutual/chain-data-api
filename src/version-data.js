@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 const Web3 = require('web3');
-const log = require('./log')
+const log = require('./log');
 
 const { setupLoader } = require('@openzeppelin/contract-loader');
 
@@ -21,7 +21,7 @@ class VersionData {
     }
 
     this.data = data[this.chain].abis
-      .reduce((data, abi) => ({ ...data, [abi.code]: {...abi, contractAbi: JSON.parse(abi.contractAbi) } }), {});
+      .reduce((data, abi) => ({ ...data, [abi.code]: { ...abi, contractAbi: JSON.parse(abi.contractAbi) } }), {});
     const web3 = new Web3(this.providerURL);
     this.web3 = web3;
 
@@ -40,7 +40,7 @@ class VersionData {
     return this.loader.fromABI(abi, null, address);
   }
 
-  getABIList() {
+  getABIList () {
     const abiList = [];
     for (const abi of Object.values(this.data)) {
       abiList.push(abi);

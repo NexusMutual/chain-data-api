@@ -33,7 +33,7 @@ module.exports = (chainDataAggregator) => {
       totalStaked,
       coverPurchased,
       totalRewards,
-      averageReturns
+      averageReturns,
     });
   }));
 
@@ -48,7 +48,7 @@ module.exports = (chainDataAggregator) => {
     const { totalRewards, annualizedReturns } = await chainDataAggregator.getMemberAggregatedStats(req.params.member);
     res.json({
       totalRewards,
-      annualizedReturns
+      annualizedReturns,
     });
   }));
 

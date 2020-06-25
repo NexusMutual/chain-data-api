@@ -10,7 +10,7 @@ const rewardedEventSchema = new mongoose.Schema({
   timestamp: { type: Number },
   amount: { type: String },
   contractAddress: { type: String },
-})
+});
 
 rewardedEventSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
 
