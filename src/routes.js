@@ -1,8 +1,9 @@
 const express = require('express');
+const log = require('./log');
 
 const asyncRoute = route => (req, res) => {
   route(req, res).catch(e => {
-    console.error('Route error:', e);
+    log.error(`Route error: ${e.stack}`);
     res.status(500).send({
       error: true,
       message: 'Internal server error',
@@ -10,9 +11,8 @@ const asyncRoute = route => (req, res) => {
   });
 };
 
-
 /**
- * @param {QuoteEngine} quoteEngine
+ * @param {ChainDataAggregator} chainDataAggregator
  * @return {app}
  */
 module.exports = (chainDataAggregator) => {
@@ -38,6 +38,12 @@ module.exports = (chainDataAggregator) => {
   }));
 
   app.get('/stats/:member', asyncRoute(async (req, res) => {
+    const days = parseInt(req.query.days);
+    if (days < 7 || days > 30) {
+      const errMessage = `days parameter needs to be between 7 and 30`;
+      log.error(errMessage);
+      return res.status(400).json({ message: errMessage });
+    }
 
     const { totalRewards, annualizedReturns } = await chainDataAggregator.getMemberAggregatedStats(req.params.member);
     res.json({

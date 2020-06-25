@@ -20,19 +20,33 @@ class ChainDataAggregator {
     return await OverallAggregatedStats.findOne();
   }
 
-  async getMemberAggregatedStats(member) {
+  async getMemberAggregatedStats(member, annualizedDaysInterval) {
     const pooledStaking = this.versionData.instance('PS');
     const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
       filter: {
         staker: member,
       }
-    })
+    });
 
-    const withdrawAmounts = rewardWithdrawnEvents.map(event => event.returnValues.amount);
+    // TODO: not efficient to fetch these blocks everytime
+    await Promise.all(rewardWithdrawnEvents.map(async event => {
+       const block = await this.versionData.web3.eth.getBlock(event.blockNumber);
+       event.timestamp = block.timestamp;
+    }));
+
+    const withdrawAmounts = rewardWithdrawnEvents.map(event => new BN(event.returnValues.amount));
     const totalWithdrawnAmounts = withdrawAmounts.reduce((a, b) => a.add(b), new BN('0'));
     const currentReward = await pooledStaking.stakerReward(member);
     const totalRewards = totalWithdrawnAmounts.add(currentReward).toString();
-    return { totalRewards };
+
+    const dailyStakerData = await DailyStakerData
+        .find({ address: member })
+        .sort({ timestamp: -1 })
+        .limit(annualizedDaysInterval);
+
+    dailyStakerData.reverse();
+    const annualizedReturns = stakerAnnualizedReturns(dailyStakerData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval);
+    return { totalRewards, annualizedReturns };
   }
 
   async syncOverallAggregateStats() {
@@ -143,12 +157,17 @@ class ChainDataAggregator {
     const today = new Date();
     // normalize to midnight
     today.setHours(0, 0, 0, 0);
-    const dailyStakerDataRecords = allStakerData.map(({ staker, deposit}) => {
-      return { address: staker, deposit: deposit.toString(), date: today.toISOString() };
+    const fetchedDate = new Date();
+    const dailyStakerDataRecords = allStakerData.map(({ staker, deposit, reward }) => {
+      return {
+        address: staker,
+        deposit: deposit.toString(),
+        reward: reward.toString(),
+        timestamp: today.getTime(),
+        fetchedDate: fetchedDate.toISOString() };
     });
 
     log.info(`Storing ${dailyStakerDataRecords.length} daily staker deposits.`);
-
     try {
       await DailyStakerData.insertMany(dailyStakerDataRecords, { ordered: false });
     } catch (e) {
@@ -211,6 +230,29 @@ async function runForever(f, interval, errorInterval) {
 
 function flattenEvent(event) {
   return { ...event, ...event.returnValues }
+}
+
+function stakerAnnualizedReturns(latestData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval) {
+  if (latestData.length === 0) {
+    return undefined;
+  }
+
+  const firstStakerData = latestData[0];
+  const startTime = new Date(firstStakerData.fetchedDate).getTime();
+  const rewardsPostStartTime = rewardWithdrawnEvents
+    .filter(rewardEvent => rewardEvent.timestamp * 1000 >= startTime)
+    .map(event => new BN(event.returnValues.amount));
+
+  let storedRewardDifference = currentReward.sub(new BN(firstStakerData.reward));
+  const sumOfRewardsPerInterval = rewardsPostStartTime.reduce((a, b) => a.add(b), storedRewardDifference);
+  const averageDeposit = latestData
+    .map(stakerData => new BN(stakerData.deposit))
+    .reduce((a, b) => a.add(b), new BN('0')).div(new BN(latestData.length));
+
+  const exponent = 365 / annualizedDaysInterval;
+
+  const annualizedReturns = (parseInt(sumOfRewardsPerInterval.toString()) / parseInt(averageDeposit.toString()) + 1) ** exponent - 1;
+  return annualizedReturns;
 }
 
 
