@@ -18,8 +18,16 @@ class ChainDataAggregator {
   }
 
   async getOverallAggregatedStats () {
+
     const overallAggregatedStats = await OverallAggregatedStats.findOne();
-    return overallAggregatedStats;
+    const tokenPrice = await this.getCurrentTokenPrice('DAI');
+    const stats = {
+      totalStaked: getUSDValue(new BN(overallAggregatedStats.totalStaked), tokenPrice).toString(),
+      coverPurchased: getUSDValue(new BN(overallAggregatedStats.coverPurchased), tokenPrice).toString(),
+      totalRewards: getUSDValue(new BN(overallAggregatedStats.totalRewards), tokenPrice).toString(),
+      averageReturns: overallAggregatedStats.averageReturns
+    };
+    return stats;
   }
 
   async getMemberAggregatedStats (member, annualizedDaysInterval) {
@@ -294,6 +302,11 @@ function stakerAnnualizedReturns (latestData, currentReward, rewardWithdrawnEven
    */
   const annualizedReturns = (parseInt(sumOfRewardsPerInterval.toString()) / parseInt(averageDeposit.toString()) + 1) ** exponent - 1;
   return annualizedReturns;
+}
+
+function getUSDValue(nxmPrice, daiPrice) {
+  const nxmInUSD = daiPrice.div(new BN(10e18.toString()));
+  return nxmPrice.div(new BN(10e18.toString())).mul(nxmInUSD);
 }
 
 module.exports = ChainDataAggregator;
