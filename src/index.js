@@ -47,7 +47,7 @@ async function init () {
     chainDataAggregator.syncOverallAggregateStats.bind(chainDataAggregator),
     overallStatsSyncInterval,
     syncFailureRetryInterval,
-    0
+    0,
   );
 
   const syncDailyDelay = 10000;
@@ -55,7 +55,7 @@ async function init () {
     chainDataAggregator.syncDailyStakerData.bind(chainDataAggregator),
     stakerDataSyncInterval,
     syncFailureRetryInterval,
-    syncDailyDelay
+    syncDailyDelay,
   );
 }
 
