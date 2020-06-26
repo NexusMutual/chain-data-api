@@ -276,13 +276,27 @@ function flattenEvent (event) {
   return { ...event, ...event.returnValues };
 }
 
-function stakerAnnualizedReturns (latestData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval) {
+/**
+ * Uses the staker data snapshots for the last annualizedDaysInterval days to compute
+ * the rewards gained by the user until the present time by calculating the difference between the snapshot
+ * reward value at the start of the interval, the current stored reward value and adding to that all rewardWithdrawn
+ * values in the time interval.
+ *
+ * Computes the average deposit from all the deposit values in latestStakerData.
+ *
+ * @param latestStakerData
+ * @param currentReward
+ * @param rewardWithdrawnEvents
+ * @param annualizedDaysInterval
+ * @returns {*}
+ */
+function stakerAnnualizedReturns (latestStakerData, currentReward, rewardWithdrawnEvents, annualizedDaysInterval) {
 
-  if (latestData.length === 0) {
+  if (latestStakerData.length === 0) {
     return undefined;
   }
 
-  const firstStakerData = latestData[0];
+  const firstStakerData = latestStakerData[0];
   const startTime = new Date(firstStakerData.fetchedDate).getTime();
   const rewardsPostStartTime = rewardWithdrawnEvents
     .filter(rewardEvent => rewardEvent.timestamp * 1000 >= startTime)
@@ -290,9 +304,9 @@ function stakerAnnualizedReturns (latestData, currentReward, rewardWithdrawnEven
 
   const storedRewardDifference = currentReward.sub(new BN(firstStakerData.reward));
   const sumOfRewardsPerInterval = rewardsPostStartTime.reduce((a, b) => a.add(b), storedRewardDifference);
-  const averageDeposit = latestData
+  const averageDeposit = latestStakerData
     .map(stakerData => new BN(stakerData.deposit))
-    .reduce((a, b) => a.add(b), new BN('0')).div(new BN(latestData.length));
+    .reduce((a, b) => a.add(b), new BN('0')).div(new BN(latestStakerData.length));
 
   const exponent = 365 / annualizedDaysInterval;
 
