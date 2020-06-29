@@ -1,7 +1,7 @@
 require('dotenv').config();
 const routes = require('./routes');
 const ChainDataAggregator = require('./chain-data-aggregator');
-const VersionData = require('./version-data');
+const NexusContractLoader = require('./nexus-contract-loader');
 const { runForever } = require('./utils');
 const log = require('./log');
 
@@ -34,10 +34,10 @@ async function init () {
   const annualizedMinDays = getEnv('ANNUALIZED_MIN_DAYS');
   const chainName = getEnv('CHAIN_NAME', 'mainnet');
 
-  const versionData = new VersionData(chainName, versionDataURL, providerURL);
-  await versionData.init();
+  const nexusContractLoader = new NexusContractLoader(chainName, versionDataURL, providerURL);
+  await nexusContractLoader.init();
 
-  const chainDataAggregator = new ChainDataAggregator(versionData, annualizedMinDays);
+  const chainDataAggregator = new ChainDataAggregator(nexusContractLoader, annualizedMinDays);
   const app = routes(chainDataAggregator);
   await startServer(app, PORT);
   log.info(`Chain-api listening on port ${PORT}`);

@@ -4,7 +4,7 @@ const log = require('./log');
 
 const { setupLoader } = require('@openzeppelin/contract-loader');
 
-class VersionData {
+class NexusContractLoader {
 
   constructor (chain, versionDataURL, providerURL) {
     this.chain = chain;
@@ -49,4 +49,4 @@ class VersionData {
   }
 }
 
-module.exports = VersionData;
+module.exports = NexusContractLoader;
