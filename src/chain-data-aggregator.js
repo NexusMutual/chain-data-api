@@ -2,7 +2,7 @@ const Web3 = require('web3');
 const log = require('./log');
 const { hex } = require('./utils');
 
-const OverallAggregatedStats = require('./models/overall-aggregated-stats');
+const GlobalAggregatedStats = require('./models/global-aggregated-stats');
 const StakedEvent = require('./models/staked-event');
 const RewardedEvent = require('./models/rewarded-event');
 const CoverDetailsEvent = require('./models/cover-details-event');
@@ -18,15 +18,15 @@ class ChainDataAggregator {
     this.annualizedReturnsMinDays = annualizedReturnsMinDays;
   }
 
-  async getOverallAggregatedStats () {
+  async getGlobalAggregatedStats () {
 
-    const overallAggregatedStats = await OverallAggregatedStats.findOne();
+    const globalAggregatedStats = await GlobalAggregatedStats.findOne();
     const tokenPrice = await this.getCurrentTokenPrice('DAI');
     const stats = {
-      totalStaked: getUSDValue(new BN(overallAggregatedStats.totalStaked), tokenPrice).toString(),
-      coverPurchased: getUSDValue(new BN(overallAggregatedStats.coverPurchased), tokenPrice).toString(),
-      totalRewards: getUSDValue(new BN(overallAggregatedStats.totalRewards), tokenPrice).toString(),
-      averageReturns: overallAggregatedStats.averageReturns,
+      totalStaked: getUSDValue(new BN(globalAggregatedStats.totalStaked), tokenPrice).toString(),
+      coverPurchased: getUSDValue(new BN(globalAggregatedStats.coverPurchased), tokenPrice).toString(),
+      totalRewards: getUSDValue(new BN(globalAggregatedStats.totalRewards), tokenPrice).toString(),
+      averageReturns: globalAggregatedStats.averageReturns,
     };
     return stats;
   }
@@ -66,15 +66,15 @@ class ChainDataAggregator {
     return { totalRewards, annualizedReturns };
   }
 
-  async syncOverallAggregateStats () {
-    const aggregatedStats = await OverallAggregatedStats.findOne();
+  async syncGlobalAggregateStats () {
+    const aggregatedStats = await GlobalAggregatedStats.findOne();
     let fromBlock;
     if (!aggregatedStats) {
       fromBlock = 0;
     } else {
       fromBlock = aggregatedStats.latestBlockProcessed + 1;
     }
-    log.info(`Computing overall aggregated stats from block ${fromBlock}`);
+    log.info(`Computing global aggregated stats from block ${fromBlock}`);
     const latestBlockProcessed = await this.web3.eth.getBlockNumber();
     log.info(`Latest block being processed: ${latestBlockProcessed}`);
 
@@ -83,7 +83,7 @@ class ChainDataAggregator {
       this.syncTotalStaked(fromBlock),
       this.syncTotalCoverPurchases(fromBlock),
     ]);
-    const averageReturns = await this.computeOverallAverageReturns();
+    const averageReturns = await this.computeGlobalAverageReturns();
     const newValues = {
       totalStaked: totalStaked.toString(),
       totalRewards: totalRewards.toString(),
@@ -92,11 +92,11 @@ class ChainDataAggregator {
       latestBlockProcessed,
     };
 
-    log.info(`Storing OverallAggregatedStats values: ${JSON.stringify(newValues)}`);
-    await OverallAggregatedStats.updateOne({}, newValues, { upsert: true });
+    log.info(`Storing GlobalAggregatedStats values: ${JSON.stringify(newValues)}`);
+    await GlobalAggregatedStats.updateOne({}, newValues, { upsert: true });
   }
 
-  async computeOverallAverageReturns () {
+  async computeGlobalAverageReturns () {
 
     const startTimestamp = (new Date().getTime() - this.annualizedReturnsMinDays * 24 * 60 * 60 * 1000) / 1000;
     log.info(`Computing averageReturns starting with rewards from ${new Date(startTimestamp).toISOString()}`);
@@ -121,11 +121,11 @@ class ChainDataAggregator {
       .sort({ timestamp: -1 })
       .where('timestamp').eq(latestTimestamp);
 
-    const currentOverallDeposit = dailyStakerDataForLastDay
+    const currentGlobalDeposit = dailyStakerDataForLastDay
       .map(data => new BN(data.deposit))
       .reduce((a, b) => a.add(b), new BN('0'));
 
-    const averageReturns = parseInt(totalLatestReward.toString()) / parseInt(currentOverallDeposit.toString());
+    const averageReturns = parseInt(totalLatestReward.toString()) / parseInt(currentGlobalDeposit.toString());
     return averageReturns;
   }
 

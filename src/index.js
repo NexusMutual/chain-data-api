@@ -29,7 +29,7 @@ async function init () {
 
   const providerURL = getEnv('PROVIDER_URL');
   const versionDataURL = getEnv('VERSION_DATA_URL');
-  const overallStatsSyncInterval = getEnv('OVERALL_STATS_SYNC_INTERVAL');
+  const globalStatsSyncInterval = getEnv('GLOBAL_STATS_SYNC_INTERVAL');
   const stakerDataSyncInterval = getEnv('STAKER_DATA_SYNC_INTERVAL');
   const syncFailureRetryInterval = getEnv('SYNC_FAILURE_INTERVAL');
   const annualizedMinDays = getEnv('ANNUALIZED_MIN_DAYS');
@@ -49,8 +49,8 @@ async function init () {
   log.info(`Launching regular data sync processes..`);
 
   runForever(
-    chainDataAggregator.syncOverallAggregateStats.bind(chainDataAggregator),
-    overallStatsSyncInterval,
+    chainDataAggregator.syncGlobalAggregateStats.bind(chainDataAggregator),
+    globalStatsSyncInterval,
     syncFailureRetryInterval,
     0,
   );

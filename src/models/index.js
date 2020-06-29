@@ -1,7 +1,9 @@
 const StakedEvent = require('./staked-event');
-const OverallAggregatedValues = require('./overall-aggregated-values');
+const GlobalAggregatedValues = require('./global-aggregated-values');
+const RewardedEvent = require('./rewarded-event');
 
 module.exports = {
   StakedEvent,
-  OverallAggregatedValues,
+  GlobalAggregatedValues,
+  RewardedEvent
 };
