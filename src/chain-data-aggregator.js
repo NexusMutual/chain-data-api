@@ -26,7 +26,7 @@ class ChainDataAggregator {
       totalStaked: getUSDValue(new BN(overallAggregatedStats.totalStaked), tokenPrice).toString(),
       coverPurchased: getUSDValue(new BN(overallAggregatedStats.coverPurchased), tokenPrice).toString(),
       totalRewards: getUSDValue(new BN(overallAggregatedStats.totalRewards), tokenPrice).toString(),
-      averageReturns: overallAggregatedStats.averageReturns
+      averageReturns: overallAggregatedStats.averageReturns,
     };
     return stats;
   }
@@ -319,7 +319,7 @@ function stakerAnnualizedReturns (latestStakerData, currentReward, rewardWithdra
   return annualizedReturns;
 }
 
-function getUSDValue(nxmPrice, daiPrice) {
+function getUSDValue (nxmPrice, daiPrice) {
   const nxmInUSD = daiPrice.div(new BN(10e18.toString()));
   return nxmPrice.div(new BN(10e18.toString())).mul(nxmInUSD);
 }
