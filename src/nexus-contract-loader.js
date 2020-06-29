@@ -1,15 +1,14 @@
 const fetch = require('node-fetch');
-const Web3 = require('web3');
 const log = require('./log');
 
 const { setupLoader } = require('@openzeppelin/contract-loader');
 
 class NexusContractLoader {
 
-  constructor (chain, versionDataURL, providerURL) {
+  constructor (chain, versionDataURL, web3) {
     this.chain = chain;
     this.versionDataURL = versionDataURL;
-    this.providerURL = providerURL;
+    this.web3 = web3;
   }
 
   async init () {
@@ -22,11 +21,9 @@ class NexusContractLoader {
 
     this.data = data[this.chain].abis
       .reduce((data, abi) => ({ ...data, [abi.code]: { ...abi, contractAbi: JSON.parse(abi.contractAbi) } }), {});
-    const web3 = new Web3(this.providerURL);
-    this.web3 = web3;
 
     this.loader = setupLoader({
-      provider: web3.eth.currentProvider,
+      provider: this.web3.eth.currentProvider,
     }).truffle;
   }
 

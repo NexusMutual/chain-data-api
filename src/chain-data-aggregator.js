@@ -12,8 +12,9 @@ const { chunk } = require('./utils');
 const BN = new Web3().utils.BN;
 
 class ChainDataAggregator {
-  constructor (versionData, annualizedReturnsMinDays) {
-    this.versionData = versionData;
+  constructor (nexusContractLoader, web3, annualizedReturnsMinDays) {
+    this.nexusContractLoader = nexusContractLoader;
+    this.web3 = web3;
     this.annualizedReturnsMinDays = annualizedReturnsMinDays;
   }
 
@@ -31,7 +32,7 @@ class ChainDataAggregator {
   }
 
   async getMemberAggregatedStats (member, annualizedDaysInterval) {
-    const pooledStaking = this.versionData.instance('PS');
+    const pooledStaking = this.nexusContractLoader.instance('PS');
     const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
       filter: {
         staker: member,
@@ -40,7 +41,7 @@ class ChainDataAggregator {
 
     // TODO: not efficient to fetch these blocks everytime
     await Promise.all(rewardWithdrawnEvents.map(async event => {
-      const block = await this.versionData.web3.eth.getBlock(event.blockNumber);
+      const block = await this.web3.eth.getBlock(event.blockNumber);
       event.timestamp = block.timestamp;
     }));
 
@@ -74,7 +75,7 @@ class ChainDataAggregator {
       fromBlock = aggregatedStats.latestBlockProcessed + 1;
     }
     log.info(`Computing overall aggregated stats from block ${fromBlock}`);
-    const latestBlockProcessed = await this.versionData.web3.eth.getBlockNumber();
+    const latestBlockProcessed = await this.web3.eth.getBlockNumber();
     log.info(`Latest block being processed: ${latestBlockProcessed}`);
 
     const [totalRewards, totalStaked, coverPurchased] = await Promise.all([
@@ -136,7 +137,7 @@ class ChainDataAggregator {
     const flattenedRewardedEvents = newRewardedEvents.map(flattenEvent);
 
     await Promise.all(flattenedRewardedEvents.map(async event => {
-      const block = await this.versionData.web3.eth.getBlock(event.blockNumber);
+      const block = await this.web3.eth.getBlock(event.blockNumber);
       event.timestamp = block.timestamp;
     }));
 
@@ -198,7 +199,7 @@ class ChainDataAggregator {
     const chunks = chunk(allStakers, chunkSize);
     log.info(`To be processed in ${chunks.length} of max size ${chunkSize}`);
 
-    const pooledStaking = this.versionData.instance('PS');
+    const pooledStaking = this.nexusContractLoader.instance('PS');
     const allStakerData = [];
     for (const chunk of chunks) {
       const stakerData = await Promise.all(chunk.map(async staker => {
@@ -236,13 +237,13 @@ class ChainDataAggregator {
   }
 
   async getContractStake (contractAddress) {
-    const pooledStaking = this.versionData.instance('PS');
+    const pooledStaking = this.nexusContractLoader.instance('PS');
     const stake = await pooledStaking.contractStake(contractAddress);
     return stake;
   }
 
   async getStakedEvents (fromBlock) {
-    const pooledStaking = this.versionData.instance('PS');
+    const pooledStaking = this.nexusContractLoader.instance('PS');
     const stakedEvents = await pooledStaking.getPastEvents('Staked', {
       fromBlock,
     });
@@ -250,7 +251,7 @@ class ChainDataAggregator {
   }
 
   async getRewardedEvents (fromBlock) {
-    const pooledStaking = this.versionData.instance('PS');
+    const pooledStaking = this.nexusContractLoader.instance('PS');
     const rewardedEvents = await pooledStaking.getPastEvents('Rewarded', {
       fromBlock,
     });
@@ -258,7 +259,7 @@ class ChainDataAggregator {
   }
 
   async getCoverDetailsEvents (fromBlock) {
-    const quotationData = this.versionData.instance('QD');
+    const quotationData = this.nexusContractLoader.instance('QD');
     const coverDetailsEvents = await quotationData.getPastEvents('CoverDetailsEvent', {
       fromBlock,
     });
@@ -266,7 +267,7 @@ class ChainDataAggregator {
   }
 
   async getCurrentTokenPrice (currency) {
-    const mcr = this.versionData.instance('MC');
+    const mcr = this.nexusContractLoader.instance('MC');
     const tokenPrice = mcr.calculateTokenPrice(hex(currency));
     return tokenPrice;
   }
