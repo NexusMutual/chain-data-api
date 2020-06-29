@@ -39,7 +39,7 @@ async function init () {
   const web3 = new Web3(providerURL);
   await web3.eth.net.isListening();
 
-  const nexusContractLoader = new NexusContractLoader(chainName, versionDataURL, web3);
+  const nexusContractLoader = new NexusContractLoader(chainName, versionDataURL, web3.eth.currentProvider);
   await nexusContractLoader.init();
 
   const chainDataAggregator = new ChainDataAggregator(nexusContractLoader, web3, annualizedMinDays);

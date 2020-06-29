@@ -5,10 +5,10 @@ const { setupLoader } = require('@openzeppelin/contract-loader');
 
 class NexusContractLoader {
 
-  constructor (chain, versionDataURL, web3) {
+  constructor (chain, versionDataURL, provider) {
     this.chain = chain;
     this.versionDataURL = versionDataURL;
-    this.web3 = web3;
+    this.provider = provider;
   }
 
   async init () {
@@ -23,7 +23,7 @@ class NexusContractLoader {
       .reduce((data, abi) => ({ ...data, [abi.code]: { ...abi, contractAbi: JSON.parse(abi.contractAbi) } }), {});
 
     this.loader = setupLoader({
-      provider: this.web3.eth.currentProvider,
+      provider: this.provider,
     }).truffle;
   }
 
@@ -35,14 +35,6 @@ class NexusContractLoader {
     const abi = this.data[code].contractAbi;
     const address = this.address(code);
     return this.loader.fromABI(abi, null, address);
-  }
-
-  getABIList () {
-    const abiList = [];
-    for (const abi of Object.values(this.data)) {
-      abiList.push(abi);
-    }
-    return abiList;
   }
 }
 
