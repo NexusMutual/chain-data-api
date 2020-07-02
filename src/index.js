@@ -30,7 +30,7 @@ async function init () {
   const providerURL = getEnv('PROVIDER_URL');
   const versionDataURL = getEnv('VERSION_DATA_URL');
   const globalStatsSyncInterval = getEnv('GLOBAL_STATS_SYNC_INTERVAL');
-  const stakerSnapshotsSyncInterval = getEnv('STAKER_SNAPSHOT_SYNC_INTERVAL');
+  const stakerSnapshotsSyncInterval = getEnv('STAKER_SNAPSHOTS_SYNC_INTERVAL');
   const syncFailureRetryInterval = getEnv('SYNC_FAILURE_INTERVAL');
   const annualizedMinDays = getEnv('ANNUALIZED_MIN_DAYS');
   const chainName = getEnv('CHAIN_NAME', 'mainnet');
