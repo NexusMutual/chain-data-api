@@ -23,9 +23,9 @@ class ChainDataAggregator {
     const globalAggregatedStats = await GlobalAggregatedStats.findOne();
     const tokenPrice = await this.getCurrentTokenPrice('DAI');
     const stats = {
-      totalStaked: getUSDValue(new BN(globalAggregatedStats.totalStaked), tokenPrice).toString(),
-      coverPurchased: getUSDValue(new BN(globalAggregatedStats.coverPurchased), tokenPrice).toString(),
-      totalRewards: getUSDValue(new BN(globalAggregatedStats.totalRewards), tokenPrice).toString(),
+      totalStaked: getUSDValue(new BN(globalAggregatedStats.totalStaked), tokenPrice),
+      coverPurchased: getUSDValue(new BN(globalAggregatedStats.coverPurchased), tokenPrice),
+      totalRewards: getUSDValue(new BN(globalAggregatedStats.totalRewards), tokenPrice),
       averageReturns: globalAggregatedStats.averageReturns,
     };
     return stats;
@@ -321,7 +321,7 @@ function stakerAnnualizedReturns (latestStakerSnapshots, currentReward, rewardWi
 
 function getUSDValue (nxmPrice, daiPrice) {
   const nxmInUSD = daiPrice.div(new BN(1e18.toString()));
-  return nxmPrice.div(new BN(1e18.toString())).mul(nxmInUSD);
+  return parseInt(nxmPrice.div(new BN(1e18.toString())).mul(nxmInUSD).toString());
 }
 
 module.exports = ChainDataAggregator;
