@@ -320,8 +320,8 @@ function stakerAnnualizedReturns (latestStakerSnapshots, currentReward, rewardWi
 }
 
 function getUSDValue (nxmPrice, daiPrice) {
-  const nxmInUSD = daiPrice.div(new BN(10e18.toString()));
-  return nxmPrice.div(new BN(10e18.toString())).mul(nxmInUSD);
+  const nxmInUSD = daiPrice.div(new BN(1e18.toString()));
+  return nxmPrice.div(new BN(1e18.toString())).mul(nxmInUSD);
 }
 
 module.exports = ChainDataAggregator;
