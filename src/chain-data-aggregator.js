@@ -67,6 +67,7 @@ class ChainDataAggregator {
   }
 
   async syncGlobalAggregateStats () {
+    log.info(`Syncing GlobalAggregateStats..`);
     const aggregatedStats = await GlobalAggregatedStats.findOne();
     let fromBlock;
     if (!aggregatedStats) {
@@ -190,7 +191,6 @@ class ChainDataAggregator {
   }
 
   async syncDailyStakerSnapshots () {
-
     log.info(`Syncing daily staker deposits..`);
     const allStakedEvents = await StakedEvent.find();
     const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
