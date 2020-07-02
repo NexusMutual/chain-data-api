@@ -31,7 +31,8 @@ class ChainDataAggregator {
     return stats;
   }
 
-  async getMemberAggregatedStats (member, annualizedDaysInterval) {
+  async getMemberAggregatedStats (member) {
+    const annualizedDaysInterval = this.annualizedReturnsMinDays;
     const pooledStaking = this.nexusContractLoader.instance('PS');
     const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
       filter: {

@@ -38,9 +38,10 @@ module.exports = (chainDataAggregator) => {
   }));
 
   app.get('/stats/:member', asyncRoute(async (req, res) => {
-    const days = parseInt(req.query.annualizedDays);
-    if (days < 1 || days > 30) {
-      const errMessage = `days parameter needs to be between 1 and 30`;
+    const member = req.params.member;
+    log.info(`Fetching stats for member ${member}`);
+    if (!isValidEthereumAddress(member)) {
+      const errMessage = `Not a valid Ethereum address: ${member}`;
       log.error(errMessage);
       return res.status(400).json({ message: errMessage });
     }
@@ -54,3 +55,8 @@ module.exports = (chainDataAggregator) => {
 
   return app;
 };
+
+function isValidEthereumAddress (address) {
+  const ETHEREUM_ADDRESS_REGEX = /^0(x|X)[a-fA-F0-9]{40}$/;
+  return address && address.length === 42 && address.match(ETHEREUM_ADDRESS_REGEX);
+}
