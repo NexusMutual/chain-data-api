@@ -12,10 +12,10 @@ const { chunk, insertManyIgnoreDuplicates } = require('./utils');
 const BN = new Web3().utils.BN;
 
 class ChainDataAggregator {
-  constructor (nexusContractLoader, web3, annualizedReturnsMinDays) {
+  constructor (nexusContractLoader, web3, annualizedReturnsDaysInterval) {
     this.nexusContractLoader = nexusContractLoader;
     this.web3 = web3;
-    this.annualizedReturnsMinDays = annualizedReturnsMinDays;
+    this.annualizedReturnsDaysInterval = annualizedReturnsDaysInterval;
   }
 
   async getGlobalAggregatedStats () {
@@ -32,7 +32,7 @@ class ChainDataAggregator {
   }
 
   async getMemberAggregatedStats (member) {
-    const annualizedDaysInterval = this.annualizedReturnsMinDays;
+    const annualizedDaysInterval = this.annualizedReturnsDaysInterval;
     const pooledStaking = this.nexusContractLoader.instance('PS');
     const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
       filter: {
@@ -58,10 +58,10 @@ class ChainDataAggregator {
 
     dailyStakerSnapshots.reverse();
     let annualizedReturns;
-    if (dailyStakerSnapshots.length >= this.annualizedReturnsMinDays) {
+    if (dailyStakerSnapshots.length >= this.annualizedReturnsDaysInterval) {
       annualizedReturns = stakerAnnualizedReturns(dailyStakerSnapshots, currentReward, rewardWithdrawnEvents, annualizedDaysInterval);
     } else {
-      log.warn(`Insufficient ${dailyStakerSnapshots.length} daily staker snapshots to compute annualized returns for member ${member}. Required: ${this.annualizedReturnsMinDays}`);
+      log.warn(`Insufficient ${dailyStakerSnapshots.length} daily staker snapshots to compute annualized returns for member ${member}. Required: ${this.annualizedReturnsDaysInterval}`);
     }
 
     return { totalRewards, annualizedReturns };
@@ -100,7 +100,7 @@ class ChainDataAggregator {
 
   async computeGlobalAverageReturns () {
 
-    const startTimestamp = (new Date().getTime() - this.annualizedReturnsMinDays * 24 * 60 * 60 * 1000) / 1000;
+    const startTimestamp = (new Date().getTime() - this.annualizedReturnsDaysInterval * 24 * 60 * 60 * 1000) / 1000;
     log.info(`Computing averageReturns starting with rewards from ${new Date(startTimestamp).toISOString()}`);
     const latestRewardedEvents = await RewardedEvent
       .find()
