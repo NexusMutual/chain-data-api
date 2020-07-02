@@ -5,5 +5,5 @@ const RewardedEvent = require('./rewarded-event');
 module.exports = {
   StakedEvent,
   GlobalAggregatedValues,
-  RewardedEvent
+  RewardedEvent,
 };

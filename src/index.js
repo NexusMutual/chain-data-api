@@ -30,7 +30,7 @@ async function init () {
   const providerURL = getEnv('PROVIDER_URL');
   const versionDataURL = getEnv('VERSION_DATA_URL');
   const globalStatsSyncInterval = getEnv('GLOBAL_STATS_SYNC_INTERVAL');
-  const stakerDataSyncInterval = getEnv('STAKER_DATA_SYNC_INTERVAL');
+  const stakerSnapshotsSyncInterval = getEnv('STAKER_SNAPSHOT_SYNC_INTERVAL');
   const syncFailureRetryInterval = getEnv('SYNC_FAILURE_INTERVAL');
   const annualizedMinDays = getEnv('ANNUALIZED_MIN_DAYS');
   const chainName = getEnv('CHAIN_NAME', 'mainnet');
@@ -48,7 +48,7 @@ async function init () {
   log.info(`Chain-api listening on port ${PORT}`);
   log.info(`Launching regular data sync processes..`);
 
-  runForever(
+  const backgroundGlobalAggregateStats = runForever(
     chainDataAggregator.syncGlobalAggregateStats.bind(chainDataAggregator),
     globalStatsSyncInterval,
     syncFailureRetryInterval,
@@ -57,11 +57,13 @@ async function init () {
 
   const syncDailyDelay = 10000;
   runForever(
-    chainDataAggregator.syncDailyStakerData.bind(chainDataAggregator),
-    stakerDataSyncInterval,
+    chainDataAggregator.syncDailyStakerSnapshots.bind(chainDataAggregator),
+    stakerSnapshotsSyncInterval,
     syncFailureRetryInterval,
     syncDailyDelay,
   );
+
+  // await Promise.all([backgroundGlobalAggregateStats, ])
 }
 
 init()
