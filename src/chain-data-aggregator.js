@@ -7,7 +7,7 @@ const StakedEvent = require('./models/staked-event');
 const RewardedEvent = require('./models/rewarded-event');
 const CoverDetailsEvent = require('./models/cover-details-event');
 const DailyStakerSnapshot = require('./models/daily-staker-snapshot');
-const { chunk } = require('./utils');
+const { chunk, insertManyIgnoreDuplicates } = require('./utils');
 
 const BN = new Web3().utils.BN;
 
@@ -141,7 +141,7 @@ class ChainDataAggregator {
       event.timestamp = block.timestamp;
     }));
 
-    await RewardedEvent.insertMany(flattenedRewardedEvents);
+    await insertManyIgnoreDuplicates(RewardedEvent, flattenedRewardedEvents);
 
     const rewardedEvents = await RewardedEvent.find();
     const rewardValues = rewardedEvents.map(event => new BN(event.amount));
@@ -155,7 +155,7 @@ class ChainDataAggregator {
     const newStakedEvents = await this.getStakedEvents(fromBlock);
     log.info(`Detected ${newStakedEvents.length} new events.`);
     const flattenedStakedEvents = newStakedEvents.map(flattenEvent);
-    await StakedEvent.insertMany(flattenedStakedEvents);
+    await insertManyIgnoreDuplicates(StakedEvent, flattenedStakedEvents);
 
     const stakedEvents = await StakedEvent.find();
     const contractSet = new Set();
@@ -181,7 +181,7 @@ class ChainDataAggregator {
     const newCoverDetailsEvents = await this.getCoverDetailsEvents(fromBlock);
     log.info(`Detected ${newCoverDetailsEvents.length} new events.`);
     const flattenedCoverDetailsEvents = newCoverDetailsEvents.map(flattenEvent);
-    await CoverDetailsEvent.insertMany(flattenedCoverDetailsEvents);
+    await insertManyIgnoreDuplicates(CoverDetailsEvent, flattenedCoverDetailsEvents);
 
     const coverDetailsEvents = await CoverDetailsEvent.find();
     const premiumNXMValues = coverDetailsEvents.map(event => new BN(event.premiumNXM));
@@ -226,14 +226,7 @@ class ChainDataAggregator {
     });
 
     log.info(`Storing ${dailyStakerSnapshotRecords.length} daily staker deposits.`);
-    try {
-      await DailyStakerSnapshot.insertMany(dailyStakerSnapshotRecords, { ordered: false });
-    } catch (e) {
-      // ignore duplicate errors with code 11000
-      if (e.code !== 11000) {
-        throw e;
-      }
-    }
+    await insertManyIgnoreDuplicates(DailyStakerSnapshot, dailyStakerSnapshotRecords);
   }
 
   async getContractStake (contractAddress) {

@@ -29,9 +29,23 @@ async function runForever (f, interval, errorInterval, startDelay) {
   }
 }
 
+async function insertManyIgnoreDuplicates (model, records) {
+  try {
+    await model.insertMany(records, { ordered: false });
+  } catch (e) {
+    // ignore duplicate errors with code 11000
+    if (e.code !== 11000) {
+      throw e;
+    } else {
+      log.debug(`Duplicates detected and skipped.`);
+    }
+  }
+}
+
 module.exports = {
   hex,
   sleep,
   chunk,
   runForever,
+  insertManyIgnoreDuplicates,
 };
