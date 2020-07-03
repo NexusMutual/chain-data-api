@@ -198,7 +198,7 @@ class ChainDataAggregator {
     log.info(`There are ${allStakers.length} stakers to sync.`);
     const chunkSize = 50;
     const chunks = chunk(allStakers, chunkSize);
-    log.info(`To be processed in ${chunks.length} of max size ${chunkSize}`);
+    log.info(`To be processed in ${chunks.length} chunks of max size ${chunkSize}`);
 
     const pooledStaking = this.nexusContractLoader.instance('PS');
     const allStakerSnapshots = [];
@@ -223,6 +223,7 @@ class ChainDataAggregator {
         deposit: deposit.toString(),
         reward: reward.toString(),
         timestamp: today.getTime(),
+        // toISOString() defaults to UTC timezone
         fetchedDate: fetchedDate.toISOString() };
     });
 

@@ -26,10 +26,10 @@ async function init () {
   const PORT = getEnv('PORT');
   const providerURL = getEnv('PROVIDER_URL');
   const versionDataURL = getEnv('VERSION_DATA_URL');
-  const globalStatsSyncInterval = getEnv('GLOBAL_STATS_SYNC_INTERVAL');
-  const stakerSnapshotsSyncInterval = getEnv('STAKER_SNAPSHOTS_SYNC_INTERVAL');
-  const syncFailureRetryInterval = getEnv('SYNC_FAILURE_INTERVAL');
-  const annualizedMinDays = getEnv('ANNUALIZED_MIN_DAYS');
+  const globalStatsSyncInterval = parseInt(getEnv('GLOBAL_STATS_SYNC_INTERVAL'));
+  const stakerSnapshotsSyncInterval = parseInt(getEnv('STAKER_SNAPSHOTS_SYNC_INTERVAL'));
+  const syncFailureRetryInterval = parseInt(getEnv('SYNC_FAILURE_INTERVAL'));
+  const annualizedDaysInterval = parseInt(getEnv('ANNUALIZED_DAYS_INTERVAL'));
   const network = getEnv('NETWORK', 'mainnet');
 
   log.info(`Connecting to node at ${providerURL}..`);
@@ -39,7 +39,7 @@ async function init () {
   const nexusContractLoader = new NexusContractLoader(network, versionDataURL, web3.eth.currentProvider);
   await nexusContractLoader.init();
 
-  const chainDataAggregator = new ChainDataAggregator(nexusContractLoader, web3, annualizedMinDays);
+  const chainDataAggregator = new ChainDataAggregator(nexusContractLoader, web3, annualizedDaysInterval);
   const app = routes(chainDataAggregator);
   await startServer(app, PORT);
   log.info(`Chain-api listening on port ${PORT}`);
