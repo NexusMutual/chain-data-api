@@ -1,13 +1,12 @@
 const Web3 = require('web3');
 const log = require('./log');
 const { hex } = require('./utils');
-
 const {
-  StakedEvent,
-  RewardedEvent,
-  CoverDetailsEvent,
-  DailyStakerSnapshot,
-  GlobalAggregatedStats,
+  Stake,
+  Reward,
+  Cover,
+  StakerSnapshot,
+  StakingStatsSnapshot,
 } = require('./models');
 const { chunk, insertManyIgnoreDuplicates } = require('./utils');
 
@@ -22,7 +21,7 @@ class StakingStats {
 
   async getGlobalAggregatedStats () {
 
-    const globalAggregatedStats = await GlobalAggregatedStats.findOne();
+    const globalAggregatedStats = await StakingStatsSnapshot.findOne();
     const tokenPrice = await this.getCurrentTokenPrice('DAI');
     const stats = {
       totalStaked: getUSDValue(new BN(globalAggregatedStats.totalStaked), tokenPrice),
@@ -53,7 +52,7 @@ class StakingStats {
     const currentReward = await pooledStaking.stakerReward(member);
     const totalRewards = totalWithdrawnAmounts.add(currentReward).toString();
 
-    const dailyStakerSnapshots = await DailyStakerSnapshot
+    const dailyStakerSnapshots = await StakerSnapshot
       .find({ address: member })
       .sort({ timestamp: -1 })
       .limit(annualizedDaysInterval);
@@ -71,7 +70,7 @@ class StakingStats {
 
   async syncGlobalAggregateStats () {
     log.info(`Syncing GlobalAggregateStats..`);
-    const aggregatedStats = await GlobalAggregatedStats.findOne();
+    const aggregatedStats = await StakingStatsSnapshot.findOne();
     const fromBlock = aggregatedStats ? aggregatedStats.latestBlockProcessed + 1 : 0;
     log.info(`Computing global aggregated stats from block ${fromBlock}`);
     const latestBlockProcessed = await this.web3.eth.getBlockNumber();
@@ -92,21 +91,21 @@ class StakingStats {
     };
 
     log.info(`Storing GlobalAggregatedStats values: ${JSON.stringify(newValues)}`);
-    await GlobalAggregatedStats.updateOne({}, newValues, { upsert: true });
+    await StakingStatsSnapshot.updateOne({}, newValues, { upsert: true });
   }
 
   async computeGlobalAverageReturns () {
 
     const startTimestamp = (new Date().getTime() - this.annualizedReturnsDaysInterval * 24 * 60 * 60 * 1000) / 1000;
     log.info(`Computing averageReturns starting with rewards from ${new Date(startTimestamp).toISOString()}`);
-    const latestRewardedEvents = await RewardedEvent
+    const latestRewardedEvents = await Reward
       .find()
       .where('timestamp').gt(startTimestamp);
 
     const latestRewards = latestRewardedEvents.map(event => new BN(event.amount));
     const totalLatestReward = latestRewards.reduce((a, b) => a.add(b), new BN('0'));
 
-    const latest = await DailyStakerSnapshot
+    const latest = await StakerSnapshot
       .findOne()
       .sort({ timestamp: -1 });
 
@@ -115,7 +114,7 @@ class StakingStats {
     }
 
     const latestTimestamp = latest.timestamp;
-    const dailyStakerSnapshotForLastDay = await DailyStakerSnapshot
+    const dailyStakerSnapshotForLastDay = await StakerSnapshot
       .find()
       .sort({ timestamp: -1 })
       .where('timestamp').eq(latestTimestamp);
@@ -140,9 +139,9 @@ class StakingStats {
       event.timestamp = block.timestamp;
     }));
 
-    await insertManyIgnoreDuplicates(RewardedEvent, flattenedRewardedEvents);
+    await insertManyIgnoreDuplicates(Reward, flattenedRewardedEvents);
 
-    const rewardedEvents = await RewardedEvent.find();
+    const rewardedEvents = await Reward.find();
     const rewardValues = rewardedEvents.map(event => new BN(event.amount));
     const totalRewards = rewardValues.reduce((a, b) => a.add(b), new BN('0'));
     return totalRewards;
@@ -154,9 +153,9 @@ class StakingStats {
     const newStakedEvents = await this.getStakedEvents(fromBlock);
     log.info(`Detected ${newStakedEvents.length} new Staked events.`);
     const flattenedStakedEvents = newStakedEvents.map(flattenEvent);
-    await insertManyIgnoreDuplicates(StakedEvent, flattenedStakedEvents);
+    await insertManyIgnoreDuplicates(Stake, flattenedStakedEvents);
 
-    const stakedEvents = await StakedEvent.find();
+    const stakedEvents = await Stake.find();
     const contractSet = new Set();
     for (const stakedEvent of stakedEvents) {
       contractSet.add(stakedEvent.contractAddress);
@@ -180,9 +179,9 @@ class StakingStats {
     const newCoverDetailsEvents = await this.getCoverDetailsEvents(fromBlock);
     log.info(`Detected ${newCoverDetailsEvents.length} new CoverDetailsEvent events.`);
     const flattenedCoverDetailsEvents = newCoverDetailsEvents.map(flattenEvent);
-    await insertManyIgnoreDuplicates(CoverDetailsEvent, flattenedCoverDetailsEvents);
+    await insertManyIgnoreDuplicates(Cover, flattenedCoverDetailsEvents);
 
-    const coverDetailsEvents = await CoverDetailsEvent.find();
+    const coverDetailsEvents = await Cover.find();
     const premiumNXMValues = coverDetailsEvents.map(event => new BN(event.premiumNXM));
     const totalNXMCoverPurchaseValue = premiumNXMValues.reduce((a, b) => a.add(b), new BN('0'));
     return totalNXMCoverPurchaseValue;
@@ -190,7 +189,7 @@ class StakingStats {
 
   async syncDailyStakerSnapshots () {
     log.info(`Syncing daily staker deposits..`);
-    const allStakedEvents = await StakedEvent.find();
+    const allStakedEvents = await Stake.find();
     const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
     log.info(`There are ${allStakers.length} stakers to sync.`);
     const chunkSize = 50;
@@ -225,7 +224,7 @@ class StakingStats {
     });
 
     log.info(`Storing ${dailyStakerSnapshotRecords.length} daily staker deposits.`);
-    await insertManyIgnoreDuplicates(DailyStakerSnapshot, dailyStakerSnapshotRecords);
+    await insertManyIgnoreDuplicates(StakerSnapshot, dailyStakerSnapshotRecords);
   }
 
   async getContractStake (contractAddress) {

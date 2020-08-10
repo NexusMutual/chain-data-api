@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const coverDetailsEventSchema = new mongoose.Schema({
+const coverSchema = new mongoose.Schema({
   address: { type: String },
   blockHash: { type: String },
   blockNumber: { type: String },
@@ -16,6 +16,6 @@ const coverDetailsEventSchema = new mongoose.Schema({
   curr: String,
 });
 
-coverDetailsEventSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
+coverSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
 
-module.exports = mongoose.model('CoverDetailsEvent', coverDetailsEventSchema);
+module.exports = mongoose.model('Cover', coverSchema);

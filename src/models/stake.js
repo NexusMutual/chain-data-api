@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const stakedEventSchema = new mongoose.Schema({
+const stakeSchema = new mongoose.Schema({
   address: { type: String },
   blockHash: { type: String },
   blockNumber: { type: String },
@@ -12,6 +12,6 @@ const stakedEventSchema = new mongoose.Schema({
   staker: { type: String },
 });
 
-stakedEventSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
+stakeSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
 
-module.exports = mongoose.model('StakedEvent', stakedEventSchema);
+module.exports = mongoose.model('Stake', stakeSchema);
