@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const rewardedEventSchema = new mongoose.Schema({
   address: { type: String },
   blockHash: { type: String },
-  blockNumber: { type: String },
+  blockNumber: { type: Number },
   logIndex: { type: Number },
   transactionHash: { type: String },
 

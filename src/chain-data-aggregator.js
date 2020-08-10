@@ -128,7 +128,7 @@ class ChainDataAggregator {
 
   async syncTotalRewards (fromBlock) {
 
-    log.info(`Syncing Rewarded events..`);
+    log.info(`Syncing Rewarded events from block ${fromBlock}..`);
     const newRewardedEvents = await this.getRewardedEvents(fromBlock);
     log.info(`Detected ${newRewardedEvents.length} new Rewarded events.`);
     const flattenedRewardedEvents = newRewardedEvents.map(flattenEvent);
@@ -148,7 +148,7 @@ class ChainDataAggregator {
 
   async syncTotalStaked (fromBlock) {
 
-    log.info(`Syncing Staked events..`);
+    log.info(`Syncing Staked events from block ${fromBlock}..`);
     const newStakedEvents = await this.getStakedEvents(fromBlock);
     log.info(`Detected ${newStakedEvents.length} new Staked events.`);
     const flattenedStakedEvents = newStakedEvents.map(flattenEvent);
