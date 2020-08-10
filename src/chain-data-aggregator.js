@@ -7,6 +7,7 @@ const StakedEvent = require('./models/staked-event');
 const RewardedEvent = require('./models/rewarded-event');
 const CoverDetailsEvent = require('./models/cover-details-event');
 const DailyStakerSnapshot = require('./models/daily-staker-snapshot');
+const Block = require('./models/block');
 const { chunk, insertManyIgnoreDuplicates } = require('./utils');
 
 const BN = new Web3().utils.BN;
@@ -40,9 +41,8 @@ class ChainDataAggregator {
       },
     });
 
-    // TODO: not efficient to fetch these blocks everytime
     await Promise.all(rewardWithdrawnEvents.map(async event => {
-      const block = await this.web3.eth.getBlock(event.blockNumber);
+      const block = await this.getBlock(event.blockNumber);
       event.timestamp = block.timestamp;
     }));
 
@@ -134,7 +134,7 @@ class ChainDataAggregator {
     const flattenedRewardedEvents = newRewardedEvents.map(flattenEvent);
 
     await Promise.all(flattenedRewardedEvents.map(async event => {
-      const block = await this.web3.eth.getBlock(event.blockNumber);
+      const block = await this.getBlock(event.blockNumber);
       event.timestamp = block.timestamp;
     }));
 
@@ -144,6 +144,15 @@ class ChainDataAggregator {
     const rewardValues = rewardedEvents.map(event => new BN(event.amount));
     const totalRewards = rewardValues.reduce((a, b) => a.add(b), new BN('0'));
     return totalRewards;
+  }
+
+  async getBlock (blockNumber) {
+    let block = await Block.findOne({ number: blockNumber });
+    if (!block) {
+      block = await this.web3.eth.getBlock(blockNumber);
+      await Block.create(block);
+    }
+    return block;
   }
 
   async syncTotalStaked (fromBlock) {
