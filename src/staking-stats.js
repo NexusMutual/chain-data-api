@@ -2,16 +2,18 @@ const Web3 = require('web3');
 const log = require('./log');
 const { hex } = require('./utils');
 
-const GlobalAggregatedStats = require('./models/global-aggregated-stats');
-const StakedEvent = require('./models/staked-event');
-const RewardedEvent = require('./models/rewarded-event');
-const CoverDetailsEvent = require('./models/cover-details-event');
-const DailyStakerSnapshot = require('./models/daily-staker-snapshot');
+const {
+  StakedEvent,
+  RewardedEvent,
+  CoverDetailsEvent,
+  DailyStakerSnapshot,
+  GlobalAggregatedStats,
+} = require('./models');
 const { chunk, insertManyIgnoreDuplicates } = require('./utils');
 
 const BN = new Web3().utils.BN;
 
-class ChainDataAggregator {
+class StakingStats {
   constructor (nexusContractLoader, web3, annualizedReturnsDaysInterval) {
     this.nexusContractLoader = nexusContractLoader;
     this.web3 = web3;
@@ -314,4 +316,4 @@ function getUSDValue (nxmPrice, daiPrice) {
   return parseInt(nxmPrice.div(new BN(1e18.toString())).mul(nxmInUSD).toString());
 }
 
-module.exports = ChainDataAggregator;
+module.exports = StakingStats;

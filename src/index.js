@@ -1,6 +1,6 @@
 require('dotenv').config();
 const routes = require('./routes');
-const ChainDataAggregator = require('./chain-data-aggregator');
+const StakingStats = require('./staking-stats');
 const NexusContractLoader = require('./nexus-contract-loader');
 const Web3 = require('web3');
 const { runForever } = require('./utils');
@@ -39,7 +39,7 @@ async function init () {
   const nexusContractLoader = new NexusContractLoader(network, versionDataURL, web3.eth.currentProvider);
   await nexusContractLoader.init();
 
-  const chainDataAggregator = new ChainDataAggregator(nexusContractLoader, web3, annualizedDaysInterval);
+  const chainDataAggregator = new StakingStats(nexusContractLoader, web3, annualizedDaysInterval);
   const app = routes(chainDataAggregator);
   await startServer(app, PORT);
   log.info(`Chain-api listening on port ${PORT}`);
