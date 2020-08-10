@@ -15,17 +15,24 @@ function chunk (arr, chunkSize) {
   return chunks;
 }
 
+async function to(promise) {
+  return new Promise(resolve => {
+    promise
+      .then(result => resolve([result, null]))
+      .catch(error => resolve([null, error]));
+  });
+}
+
 async function runForever (f, interval, errorInterval, startDelay) {
   log.info(`Running forever with interval = ${interval}, errorInterval = ${errorInterval}, startDelay = ${startDelay}`);
   await sleep(startDelay);
   while (true) {
-    try {
-      await f();
-      await sleep(interval);
-    } catch (e) {
+    const [result, error] = await to(f());
+    if (error) {
       log.error(`Failed with ${e.stack}. Restarting in ${errorInterval} ms.`);
-      await sleep(errorInterval);
     }
+    const sleepInterval = error ? errorInterval : interval;
+    await sleep(sleepInterval);
   }
 }
 
@@ -48,4 +55,5 @@ module.exports = {
   chunk,
   runForever,
   insertManyIgnoreDuplicates,
+  to
 };
