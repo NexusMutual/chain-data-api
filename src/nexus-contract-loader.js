@@ -12,6 +12,7 @@ class NexusContractLoader {
   }
 
   async init () {
+
     log.info(`Fetching version data from ${this.versionDataURL} for chain ${this.chain}`);
     const data = await fetch(this.versionDataURL).then(res => res.json());
 

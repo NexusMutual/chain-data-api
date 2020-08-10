@@ -1,17 +1,13 @@
 const Web3 = require('web3');
+const { toBN } = new Web3().utils;
+
 const log = require('./log');
 const { hex } = require('./utils');
-
-const GlobalAggregatedStats = require('./models/global-aggregated-stats');
-const StakedEvent = require('./models/staked-event');
-const RewardedEvent = require('./models/rewarded-event');
-const CoverDetailsEvent = require('./models/cover-details-event');
-const DailyStakerSnapshot = require('./models/daily-staker-snapshot');
 const { chunk, insertManyIgnoreDuplicates } = require('./utils');
+const { Cover, RewardedEvent, StakedEvent, StakerSnapshot, StakingStatsSnapshot } = require('./models');
 
-const BN = new Web3().utils.BN;
+class StakingStats {
 
-class ChainDataAggregator {
   constructor (nexusContractLoader, web3, annualizedReturnsDaysInterval) {
     this.nexusContractLoader = nexusContractLoader;
     this.web3 = web3;
@@ -20,62 +16,63 @@ class ChainDataAggregator {
 
   async getGlobalAggregatedStats () {
 
-    const globalAggregatedStats = await GlobalAggregatedStats.findOne();
+    const globalAggregatedStats = await StakingStatsSnapshot.findOne();
     const tokenPrice = await this.getCurrentTokenPrice('DAI');
-    const stats = {
-      totalStaked: getUSDValue(new BN(globalAggregatedStats.totalStaked), tokenPrice),
-      coverPurchased: getUSDValue(new BN(globalAggregatedStats.coverPurchased), tokenPrice),
-      totalRewards: getUSDValue(new BN(globalAggregatedStats.totalRewards), tokenPrice),
+
+    return {
+      totalStaked: getUSDValue(globalAggregatedStats.totalStaked, tokenPrice),
+      coverPurchased: getUSDValue(globalAggregatedStats.coverPurchased, tokenPrice),
+      totalRewards: getUSDValue(globalAggregatedStats.totalRewards, tokenPrice),
       averageReturns: globalAggregatedStats.averageReturns,
     };
-    return stats;
   }
 
-  async getMemberAggregatedStats (member) {
+  async getStakerStats (member) {
+
     const annualizedDaysInterval = this.annualizedReturnsDaysInterval;
     const pooledStaking = this.nexusContractLoader.instance('PS');
-    const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
-      filter: {
-        staker: member,
-      },
-    });
 
-    // TODO: not efficient to fetch these blocks everytime
-    await Promise.all(rewardWithdrawnEvents.map(async event => {
-      const block = await this.web3.eth.getBlock(event.blockNumber);
-      event.timestamp = block.timestamp;
+    // TODO: cache withdraw events in the database
+    const options = { filter: { staker: member } };
+    const withdrawEvents = await pooledStaking.getPastEvents('RewardWithdrawn', options);
+
+    const tsWithdrawEvents = await Promise.all(withdrawEvents.map(async event => {
+      const { timestamp } = await this.web3.eth.getBlock(event.blockNumber);
+      return { ...event, timestamp };
     }));
 
-    const withdrawAmounts = rewardWithdrawnEvents.map(event => new BN(event.returnValues.amount));
-    const totalWithdrawnAmounts = withdrawAmounts.reduce((a, b) => a.add(b), new BN('0'));
+    const withdrawAmounts = tsWithdrawEvents.map(event => toBN(event.returnValues.amount));
+    const totalWithdrawn = withdrawAmounts.reduce((sum, amount) => sum.add(amount), toBN('0'));
     const currentReward = await pooledStaking.stakerReward(member);
-    const totalRewards = totalWithdrawnAmounts.add(currentReward).toString();
+    const totalRewards = totalWithdrawn.add(currentReward).toString();
 
-    const dailyStakerSnapshots = await DailyStakerSnapshot
-      .find({ address: member })
-      .sort({ timestamp: -1 })
-      .limit(annualizedDaysInterval);
+    const since = Date.now() / 1000 - annualizedDaysInterval * 24 * 3600;
+    const dailyStakerSnapshots = await StakerSnapshot
+      .find({ stakerAddress: member, timestamp: { $gt: since } })
+      .sort({ timestamp: 1 });
 
-    dailyStakerSnapshots.reverse();
-    let annualizedReturns;
-    if (dailyStakerSnapshots.length >= this.annualizedReturnsDaysInterval) {
-      annualizedReturns = stakerAnnualizedReturns(dailyStakerSnapshots, currentReward, rewardWithdrawnEvents, annualizedDaysInterval);
-    } else {
-      log.warn(`Insufficient ${dailyStakerSnapshots.length} daily staker snapshots to compute annualized returns for member ${member}. Required: ${this.annualizedReturnsDaysInterval}`);
+    if (dailyStakerSnapshots.length < annualizedDaysInterval) {
+
+      log.warn(
+        `Insufficient ${dailyStakerSnapshots.length} daily staker snapshots to compute annualized` +
+        `returns for member ${member}. Required: ${this.annualizedReturnsDaysInterval}`,
+      );
+
+      return { totalRewards, annualizedReturns: 0 };
     }
+
+    const annualizedReturns = stakerAnnualizedReturns(dailyStakerSnapshots, currentReward, tsWithdrawEvents, annualizedDaysInterval);
 
     return { totalRewards, annualizedReturns };
   }
 
   async syncGlobalAggregateStats () {
-    log.info(`Syncing GlobalAggregateStats..`);
-    const aggregatedStats = await GlobalAggregatedStats.findOne();
-    let fromBlock;
-    if (!aggregatedStats) {
-      fromBlock = 0;
-    } else {
-      fromBlock = aggregatedStats.latestBlockProcessed + 1;
-    }
+
+    log.info(`Syncing global staking stats..`);
+
+    const aggregatedStats = await StakingStatsSnapshot.findOne().sort({ latestBlockProcessed: -1 });
+    const fromBlock = aggregatedStats ? aggregatedStats.latestBlockProcessed + 1 : 0;
+
     log.info(`Computing global aggregated stats from block ${fromBlock}`);
     const latestBlockProcessed = await this.web3.eth.getBlockNumber();
     log.info(`Latest block being processed: ${latestBlockProcessed}`);
@@ -85,6 +82,7 @@ class ChainDataAggregator {
       this.syncTotalStaked(fromBlock),
       this.syncTotalCoverPurchases(fromBlock),
     ]);
+
     const averageReturns = await this.computeGlobalAverageReturns();
     const newValues = {
       totalStaked: totalStaked.toString(),
@@ -95,7 +93,7 @@ class ChainDataAggregator {
     };
 
     log.info(`Storing GlobalAggregatedStats values: ${JSON.stringify(newValues)}`);
-    await GlobalAggregatedStats.updateOne({}, newValues, { upsert: true });
+    await StakingStatsSnapshot.updateOne({}, newValues, { upsert: true });
   }
 
   async computeGlobalAverageReturns () {
@@ -106,10 +104,10 @@ class ChainDataAggregator {
       .find()
       .where('timestamp').gt(startTimestamp);
 
-    const latestRewards = latestRewardedEvents.map(event => new BN(event.amount));
-    const totalLatestReward = latestRewards.reduce((a, b) => a.add(b), new BN('0'));
+    const latestRewards = latestRewardedEvents.map(event => toBN(event.amount));
+    const totalLatestReward = latestRewards.reduce((a, b) => a.add(b), toBN('0'));
 
-    const latest = await DailyStakerSnapshot
+    const latest = await StakerSnapshot
       .findOne()
       .sort({ timestamp: -1 });
 
@@ -118,14 +116,14 @@ class ChainDataAggregator {
     }
 
     const latestTimestamp = latest.timestamp;
-    const dailyStakerSnapshotForLastDay = await DailyStakerSnapshot
+    const dailyStakerSnapshotForLastDay = await StakerSnapshot
       .find()
       .sort({ timestamp: -1 })
       .where('timestamp').eq(latestTimestamp);
 
     const currentGlobalDeposit = dailyStakerSnapshotForLastDay
-      .map(data => new BN(data.deposit))
-      .reduce((a, b) => a.add(b), new BN('0'));
+      .map(data => toBN(data.deposit))
+      .reduce((a, b) => a.add(b), toBN('0'));
 
     const averageReturns = parseInt(totalLatestReward.toString()) / parseInt(currentGlobalDeposit.toString());
     return averageReturns;
@@ -146,8 +144,8 @@ class ChainDataAggregator {
     await insertManyIgnoreDuplicates(RewardedEvent, flattenedRewardedEvents);
 
     const rewardedEvents = await RewardedEvent.find();
-    const rewardValues = rewardedEvents.map(event => new BN(event.amount));
-    const totalRewards = rewardValues.reduce((a, b) => a.add(b), new BN('0'));
+    const rewardValues = rewardedEvents.map(event => toBN(event.amount));
+    const totalRewards = rewardValues.reduce((a, b) => a.add(b), toBN('0'));
     return totalRewards;
   }
 
@@ -175,7 +173,7 @@ class ChainDataAggregator {
       }
     }));
 
-    const totalStaked = contractStakes.reduce((a, b) => a.add(b), new BN('0'));
+    const totalStaked = contractStakes.reduce((a, b) => a.add(b), toBN('0'));
     return totalStaked;
   }
 
@@ -183,11 +181,11 @@ class ChainDataAggregator {
     const newCoverDetailsEvents = await this.getCoverDetailsEvents(fromBlock);
     log.info(`Detected ${newCoverDetailsEvents.length} new events.`);
     const flattenedCoverDetailsEvents = newCoverDetailsEvents.map(flattenEvent);
-    await insertManyIgnoreDuplicates(CoverDetailsEvent, flattenedCoverDetailsEvents);
+    await insertManyIgnoreDuplicates(Cover, flattenedCoverDetailsEvents);
 
-    const coverDetailsEvents = await CoverDetailsEvent.find();
-    const premiumNXMValues = coverDetailsEvents.map(event => new BN(event.premiumNXM));
-    const totalNXMCoverPurchaseValue = premiumNXMValues.reduce((a, b) => a.add(b), new BN('0'));
+    const coverDetailsEvents = await Cover.find();
+    const premiumNXMValues = coverDetailsEvents.map(event => toBN(event.premiumNXM));
+    const totalNXMCoverPurchaseValue = premiumNXMValues.reduce((a, b) => a.add(b), toBN('0'));
     return totalNXMCoverPurchaseValue;
   }
 
@@ -224,11 +222,12 @@ class ChainDataAggregator {
         reward: reward.toString(),
         timestamp: today.getTime(),
         // toISOString() defaults to UTC timezone
-        fetchedDate: fetchedDate.toISOString() };
+        fetchedDate: fetchedDate.toISOString(),
+      };
     });
 
     log.info(`Storing ${dailyStakerSnapshotRecords.length} daily staker deposits.`);
-    await insertManyIgnoreDuplicates(DailyStakerSnapshot, dailyStakerSnapshotRecords);
+    await insertManyIgnoreDuplicates(StakerSnapshot, dailyStakerSnapshotRecords);
   }
 
   async getContractStake (contractAddress) {
@@ -296,27 +295,35 @@ function stakerAnnualizedReturns (latestStakerSnapshots, currentReward, rewardWi
   const startTime = new Date(firstStakerSnapshot.fetchedDate).getTime();
   const rewardsPostStartTime = rewardWithdrawnEvents
     .filter(rewardEvent => rewardEvent.timestamp * 1000 >= startTime)
-    .map(event => new BN(event.returnValues.amount));
+    .map(event => toBN(event.returnValues.amount));
 
-  const storedRewardDifference = currentReward.sub(new BN(firstStakerSnapshot.reward));
+  const storedRewardDifference = currentReward.sub(toBN(firstStakerSnapshot.reward));
   const sumOfRewardsPerInterval = rewardsPostStartTime.reduce((a, b) => a.add(b), storedRewardDifference);
   const averageDeposit = latestStakerSnapshots
-    .map(stakerSnapshot => new BN(stakerSnapshot.deposit))
-    .reduce((a, b) => a.add(b), new BN('0')).div(new BN(latestStakerSnapshots.length));
+    .map(stakerSnapshot => toBN(stakerSnapshot.deposit))
+    .reduce((a, b) => a.add(b), toBN('0')).div(toBN(latestStakerSnapshots.length));
 
   const exponent = 365 / annualizedDaysInterval;
 
   /**
-   *  (sumOfRewardsPerInterval / averageDeposit + 1) ^ ( 365 / annualizedDaysInterval) -1;
+   * (sumOfRewardsPerInterval / averageDeposit + 1) ^ ( 365 / annualizedDaysInterval) -1;
    * @type {number}
    */
-  const annualizedReturns = (parseInt(sumOfRewardsPerInterval.toString()) / parseInt(averageDeposit.toString()) + 1) ** exponent - 1;
-  return annualizedReturns;
+  return (parseInt(sumOfRewardsPerInterval.toString()) / parseInt(averageDeposit.toString()) + 1) ** exponent - 1;
 }
 
+/**
+ * @param nxmPrice {string}
+ * @param daiPrice {string}
+ * @return {string}
+ */
 function getUSDValue (nxmPrice, daiPrice) {
-  const nxmInUSD = daiPrice.div(new BN(1e18.toString()));
-  return parseInt(nxmPrice.div(new BN(1e18.toString())).mul(nxmInUSD).toString());
+
+  const wad = toBN(1e18);
+  const nxmPriceBN = toBN(nxmPrice);
+  const nxmInUSD = daiPrice.div(wad);
+
+  return nxmPriceBN.div(wad).mul(nxmInUSD).toString();
 }
 
-module.exports = ChainDataAggregator;
+module.exports = StakingStats;

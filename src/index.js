@@ -1,24 +1,16 @@
 require('dotenv').config();
-const routes = require('./routes');
-const ChainDataAggregator = require('./chain-data-aggregator');
-const NexusContractLoader = require('./nexus-contract-loader');
+
+const express = require('express');
 const Web3 = require('web3');
-const { runForever } = require('./utils');
+
+const routes = require('./routes');
+const StakingStats = require('./staking-stats');
+const NexusContractLoader = require('./nexus-contract-loader');
+const { getEnv, runForever } = require('./utils');
 const log = require('./log');
 
 async function startServer (app, port) {
   return new Promise(resolve => app.listen(port, resolve));
-}
-
-function getEnv (key, fallback = false) {
-
-  const value = process.env[key] || fallback;
-
-  if (!value) {
-    throw new Error(`Missing env var: ${key}`);
-  }
-
-  return value;
 }
 
 async function init () {
@@ -26,10 +18,10 @@ async function init () {
   const PORT = getEnv('PORT');
   const providerURL = getEnv('PROVIDER_URL');
   const versionDataURL = getEnv('VERSION_DATA_URL');
-  const globalStatsSyncInterval = parseInt(getEnv('GLOBAL_STATS_SYNC_INTERVAL'));
-  const stakerSnapshotsSyncInterval = parseInt(getEnv('STAKER_SNAPSHOTS_SYNC_INTERVAL'));
-  const syncFailureRetryInterval = parseInt(getEnv('SYNC_FAILURE_INTERVAL'));
-  const annualizedDaysInterval = parseInt(getEnv('ANNUALIZED_DAYS_INTERVAL'));
+  const globalStatsSyncInterval = parseInt(getEnv('GLOBAL_STATS_SYNC_INTERVAL'), 10);
+  const stakerSnapshotsSyncInterval = parseInt(getEnv('STAKER_SNAPSHOTS_SYNC_INTERVAL'), 10);
+  const syncFailureRetryInterval = parseInt(getEnv('SYNC_FAILURE_INTERVAL'), 10);
+  const annualizedDaysInterval = parseInt(getEnv('ANNUALIZED_DAYS_INTERVAL'), 10);
   const network = getEnv('NETWORK', 'mainnet');
 
   log.info(`Connecting to node at ${providerURL}..`);
@@ -39,14 +31,17 @@ async function init () {
   const nexusContractLoader = new NexusContractLoader(network, versionDataURL, web3.eth.currentProvider);
   await nexusContractLoader.init();
 
-  const chainDataAggregator = new ChainDataAggregator(nexusContractLoader, web3, annualizedDaysInterval);
-  const app = routes(chainDataAggregator);
+  const stakingStatsAggregator = new StakingStats(nexusContractLoader, web3, annualizedDaysInterval);
+
+  const app = express();
+  routes(app, stakingStatsAggregator);
   await startServer(app, PORT);
+
   log.info(`Chain-api listening on port ${PORT}`);
   log.info(`Launching regular data sync processes..`);
 
   const backgroundGlobalAggregateStatsSync = runForever(
-    chainDataAggregator.syncGlobalAggregateStats.bind(chainDataAggregator),
+    stakingStatsAggregator.syncGlobalAggregateStats.bind(stakingStatsAggregator),
     globalStatsSyncInterval,
     syncFailureRetryInterval,
     0,
@@ -54,7 +49,7 @@ async function init () {
 
   const syncDailyDelay = 20000;
   const backgroundDailyStakerSnapshotsSync = runForever(
-    chainDataAggregator.syncDailyStakerSnapshots.bind(chainDataAggregator),
+    stakingStatsAggregator.syncDailyStakerSnapshots.bind(stakingStatsAggregator),
     stakerSnapshotsSyncInterval,
     syncFailureRetryInterval,
     syncDailyDelay,
