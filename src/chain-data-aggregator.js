@@ -70,12 +70,7 @@ class ChainDataAggregator {
   async syncGlobalAggregateStats () {
     log.info(`Syncing GlobalAggregateStats..`);
     const aggregatedStats = await GlobalAggregatedStats.findOne();
-    let fromBlock;
-    if (!aggregatedStats) {
-      fromBlock = 0;
-    } else {
-      fromBlock = aggregatedStats.latestBlockProcessed + 1;
-    }
+    const fromBlock = aggregatedStats ? aggregatedStats.latestBlockProcessed + 1 : 0;
     log.info(`Computing global aggregated stats from block ${fromBlock}`);
     const latestBlockProcessed = await this.web3.eth.getBlockNumber();
     log.info(`Latest block being processed: ${latestBlockProcessed}`);
@@ -135,7 +130,7 @@ class ChainDataAggregator {
 
     log.info(`Syncing Rewarded events..`);
     const newRewardedEvents = await this.getRewardedEvents(fromBlock);
-    log.info(`Detected ${newRewardedEvents.length} new events.`);
+    log.info(`Detected ${newRewardedEvents.length} new Rewarded events.`);
     const flattenedRewardedEvents = newRewardedEvents.map(flattenEvent);
 
     await Promise.all(flattenedRewardedEvents.map(async event => {
@@ -155,7 +150,7 @@ class ChainDataAggregator {
 
     log.info(`Syncing Staked events..`);
     const newStakedEvents = await this.getStakedEvents(fromBlock);
-    log.info(`Detected ${newStakedEvents.length} new events.`);
+    log.info(`Detected ${newStakedEvents.length} new Staked events.`);
     const flattenedStakedEvents = newStakedEvents.map(flattenEvent);
     await insertManyIgnoreDuplicates(StakedEvent, flattenedStakedEvents);
 
@@ -181,7 +176,7 @@ class ChainDataAggregator {
 
   async syncTotalCoverPurchases (fromBlock) {
     const newCoverDetailsEvents = await this.getCoverDetailsEvents(fromBlock);
-    log.info(`Detected ${newCoverDetailsEvents.length} new events.`);
+    log.info(`Detected ${newCoverDetailsEvents.length} new CoverDetailsEvent events.`);
     const flattenedCoverDetailsEvents = newCoverDetailsEvents.map(flattenEvent);
     await insertManyIgnoreDuplicates(CoverDetailsEvent, flattenedCoverDetailsEvents);
 
