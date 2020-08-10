@@ -15,7 +15,7 @@ function chunk (arr, chunkSize) {
   return chunks;
 }
 
-async function to (promise) {
+async function to(promise) {
   return new Promise(resolve => {
     promise
       .then(result => resolve([result, null]))
@@ -29,7 +29,7 @@ async function runForever (f, interval, errorInterval, startDelay) {
   while (true) {
     const [result, error] = await to(f());
     if (error) {
-      log.error(`Failed with ${error.stack}. Restarting in ${errorInterval} ms.`);
+      log.error(`Failed with ${e.stack}. Restarting in ${errorInterval} ms.`);
     }
     const sleepInterval = error ? errorInterval : interval;
     await sleep(sleepInterval);
@@ -55,5 +55,5 @@ module.exports = {
   chunk,
   runForever,
   insertManyIgnoreDuplicates,
-  to,
+  to
 };
