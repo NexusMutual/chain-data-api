@@ -188,7 +188,7 @@ class StakingStats {
     return totalNXMCoverPurchaseValue;
   }
 
-  async syncDailyStakerSnapshots () {
+  async syncStakerSnapshots () {
     log.info(`Syncing daily staker deposits..`);
     const allStakedEvents = await Stake.find();
     const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));

@@ -46,7 +46,7 @@ async function init () {
   log.info(`Launching regular data sync processes..`);
 
   const backgroundGlobalAggregateStatsSync = runForever(
-    chainDataAggregator.syncGlobalAggregateStats.bind(chainDataAggregator),
+    () => chainDataAggregator.syncGlobalAggregateStats(),
     globalStatsSyncInterval,
     syncFailureRetryInterval,
     0,
@@ -54,7 +54,7 @@ async function init () {
 
   const syncDailyDelay = 20000;
   const backgroundDailyStakerSnapshotsSync = runForever(
-    chainDataAggregator.syncDailyStakerSnapshots.bind(chainDataAggregator),
+    () => chainDataAggregator.syncStakerSnapshots(),
     stakerSnapshotsSyncInterval,
     syncFailureRetryInterval,
     syncDailyDelay,
