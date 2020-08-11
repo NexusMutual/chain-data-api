@@ -46,7 +46,14 @@ async function init () {
   log.info(`Launching regular data sync processes..`);
 
   const backgroundGlobalAggregateStatsSync = runForever(
-    () => chainDataAggregator.syncGlobalAggregateStats(),
+    () => chainDataAggregator.syncStakingStats(),
+    globalStatsSyncInterval,
+    syncFailureRetryInterval,
+    0,
+  );
+
+  const backgroundWithdrawnRewardSync = runForever(
+    () => chainDataAggregator.syncWithdrawnRewards(),
     globalStatsSyncInterval,
     syncFailureRetryInterval,
     0,
@@ -60,7 +67,7 @@ async function init () {
     syncDailyDelay,
   );
 
-  await Promise.all([backgroundGlobalAggregateStatsSync, backgroundDailyStakerSnapshotsSync]);
+  await Promise.all([backgroundWithdrawnRewardSync, backgroundGlobalAggregateStatsSync, backgroundDailyStakerSnapshotsSync]);
 }
 
 init()

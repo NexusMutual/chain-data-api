@@ -49,11 +49,18 @@ async function insertManyIgnoreDuplicates (model, records) {
   }
 }
 
+async function getLastProcessedBlock (model) {
+
+  const lastProcessedItem = await model.findOne().sort({ blockNumber: -1 });
+  return lastProcessedItem ? lastProcessedItem.blockNumber : 0;
+}
+
 module.exports = {
   hex,
   sleep,
   chunk,
   runForever,
   insertManyIgnoreDuplicates,
+  getLastProcessedBlock,
   to,
 };

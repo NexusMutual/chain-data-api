@@ -4,8 +4,9 @@ const withdrawnRewardSchema = new mongoose.Schema({
   staker: { type: String },
   amount: { type: String },
   timestamp: { type: Number },
+  blockNumber: { type: Number },
 });
 
-withdrawnRewardSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
+withdrawnRewardSchema.index({ staker: 1 });
 
 module.exports = mongoose.model('WithdrawnReward', withdrawnRewardSchema);

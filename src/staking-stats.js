@@ -8,6 +8,7 @@ const {
   Cover,
   StakerSnapshot,
   StakingStatsSnapshot,
+  WithdrawnReward
 } = require('./models');
 const { chunk, insertManyIgnoreDuplicates } = require('./utils');
 
@@ -69,7 +70,7 @@ class StakingStats {
     return { totalRewards, annualizedReturns };
   }
 
-  async syncGlobalAggregateStats () {
+  async syncStakingStats () {
     log.info(`Syncing GlobalAggregateStats..`);
     const aggregatedStats = await StakingStatsSnapshot.findOne();
     const fromBlock = aggregatedStats ? aggregatedStats.latestBlockProcessed + 1 : 0;
@@ -188,6 +189,24 @@ class StakingStats {
     return totalNXMCoverPurchaseValue;
   }
 
+  async syncWithdrawnRewards() {
+    log.info(`Syncing RewardWithdrawn..`);
+    log.info(`Syncing RewardWithdrawn..`);
+
+    const fromBlock = getLastProcessedBlock(WithdrawnReward);
+    log.info(`Starting from block ${fromBlock}`);
+    const rewardWithdrawnEvents = await this.getRewardWithdrawn(fromBlock);
+
+    await Promise.all(rewardWithdrawnEvents.map(async event => {
+      const block = await this.web3.eth.getBlock(event.blockNumber);
+      event.timestamp = block.timestamp;
+      event.blockNumber = block.number;
+    }));
+
+    log.info(`Inserting ${rewardWithdrawnEvents.length} WithdrawnRewards`);
+    await insertManyIgnoreDuplicates(WithdrawnReward, rewardWithdrawnEvents);
+  }
+
   async syncStakerSnapshots () {
     log.info(`Syncing daily staker deposits..`);
     const allStakedEvents = await Stake.find();
@@ -248,6 +267,14 @@ class StakingStats {
       fromBlock,
     });
     return rewardedEvents;
+  }
+
+  async getRewardWithdrawn (fromBlock) {
+    const pooledStaking = this.nexusContractLoader.instance('PS');
+    const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
+      fromBlock,
+    });
+    return rewardWithdrawnEvents;
   }
 
   async getCoverDetailsEvents (fromBlock) {
