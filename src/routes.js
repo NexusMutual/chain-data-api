@@ -46,7 +46,7 @@ module.exports = (chainDataAggregator) => {
       return res.status(400).json({ message: errMessage });
     }
 
-    const { totalRewards, annualizedReturns } = await chainDataAggregator.getMemberAggregatedStats(req.params.member);
+    const { totalRewards, annualizedReturns } = await chainDataAggregator.getStakerStats(req.params.member);
     res.json({
       totalRewards,
       annualizedReturns,

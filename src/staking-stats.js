@@ -1,4 +1,5 @@
 const Web3 = require('web3');
+const { toBN } = new Web3().utils;
 const log = require('./log');
 const { hex } = require('./utils');
 const {
@@ -32,7 +33,7 @@ class StakingStats {
     return stats;
   }
 
-  async getMemberAggregatedStats (member) {
+  async getStakerStats (member) {
     const annualizedDaysInterval = this.annualizedReturnsDaysInterval;
     const pooledStaking = this.nexusContractLoader.instance('PS');
     const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
@@ -310,9 +311,18 @@ function stakerAnnualizedReturns (latestStakerSnapshots, currentReward, rewardWi
   return annualizedReturns;
 }
 
+/**
+ * @param nxmPrice {string}
+ * @param daiPrice {string}
+ * @return {string}
+ */
 function getUSDValue (nxmPrice, daiPrice) {
-  const nxmInUSD = daiPrice.div(new BN(1e18.toString()));
-  return parseInt(nxmPrice.div(new BN(1e18.toString())).mul(nxmInUSD).toString());
+
+  const wad = toBN(1e18);
+  const nxmPriceBN = toBN(nxmPrice);
+  const nxmInUSD = daiPrice.div(wad);
+
+  return nxmPriceBN.div(wad).mul(nxmInUSD).toString();
 }
 
 module.exports = StakingStats;
