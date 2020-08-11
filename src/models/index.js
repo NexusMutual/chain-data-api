@@ -3,7 +3,7 @@ const StakingStatsSnapshot = require('./staking-stats-snapshot');
 const Reward = require('./reward');
 const Cover = require('./cover');
 const StakerSnapshot = require('./staker-snapshot');
-const RewardWithdrawal = require('./reward-withdrawal');
+const WithdrawnReward = require('./withdrawn-reward');
 
 module.exports = {
   Stake,
@@ -11,5 +11,5 @@ module.exports = {
   Reward,
   Cover,
   StakerSnapshot,
-  RewardWithdrawal
+  WithdrawnReward
 };
