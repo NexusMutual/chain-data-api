@@ -60,14 +60,14 @@ async function init () {
   );
 
   const syncDailyDelay = 20000;
-  const backgroundDailyStakerSnapshotsSync = runForever(
+  const backgroundStakerSnapshotsSync = runForever(
     () => chainDataAggregator.syncStakerSnapshots(),
     stakerSnapshotsSyncInterval,
     syncFailureRetryInterval,
     syncDailyDelay,
   );
 
-  await Promise.all([backgroundWithdrawnRewardSync, backgroundGlobalAggregateStatsSync, backgroundDailyStakerSnapshotsSync]);
+  await Promise.all([backgroundWithdrawnRewardSync, backgroundGlobalAggregateStatsSync, backgroundStakerSnapshotsSync]);
 }
 
 init()

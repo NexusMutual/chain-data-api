@@ -1,7 +1,7 @@
 const Web3 = require('web3');
 const { toBN } = new Web3().utils;
 const log = require('./log');
-const { hex } = require('./utils');
+const { hex, getLastProcessedBlock } = require('./utils');
 const {
   Stake,
   Reward,
@@ -34,44 +34,34 @@ class StakingStats {
     return stats;
   }
 
-  async getStakerStats (member) {
+  async getStakerStats (staker) {
     const annualizedDaysInterval = this.annualizedReturnsDaysInterval;
     const pooledStaking = this.nexusContractLoader.instance('PS');
-    const rewardWithdrawnEvents = await pooledStaking.getPastEvents('RewardWithdrawn', {
-      filter: {
-        staker: member,
-      },
-    });
+    const withdrawnRewards = await WithdrawnReward.find({ staker });
 
-    // TODO: not efficient to fetch these blocks everytime
-    await Promise.all(rewardWithdrawnEvents.map(async event => {
-      const block = await this.web3.eth.getBlock(event.blockNumber);
-      event.timestamp = block.timestamp;
-    }));
-
-    const withdrawAmounts = rewardWithdrawnEvents.map(event => new BN(event.returnValues.amount));
+    const withdrawAmounts = withdrawnRewards.map(withdrawnReward => new BN(withdrawnReward.amount));
     const totalWithdrawnAmounts = withdrawAmounts.reduce((a, b) => a.add(b), new BN('0'));
-    const currentReward = await pooledStaking.stakerReward(member);
+    const currentReward = await pooledStaking.stakerReward(staker);
     const totalRewards = totalWithdrawnAmounts.add(currentReward).toString();
 
     const dailyStakerSnapshots = await StakerSnapshot
-      .find({ address: member })
+      .find({ address: staker })
       .sort({ timestamp: -1 })
       .limit(annualizedDaysInterval);
 
     dailyStakerSnapshots.reverse();
     let annualizedReturns;
     if (dailyStakerSnapshots.length >= this.annualizedReturnsDaysInterval) {
-      annualizedReturns = stakerAnnualizedReturns(dailyStakerSnapshots, currentReward, rewardWithdrawnEvents, annualizedDaysInterval);
+      annualizedReturns = stakerAnnualizedReturns(dailyStakerSnapshots, currentReward, withdrawnRewards, annualizedDaysInterval);
     } else {
-      log.warn(`Insufficient ${dailyStakerSnapshots.length} daily staker snapshots to compute annualized returns for member ${member}. Required: ${this.annualizedReturnsDaysInterval}`);
+      log.warn(`Insufficient ${dailyStakerSnapshots.length} daily staker snapshots to compute annualized returns for member ${staker}. Required: ${this.annualizedReturnsDaysInterval}`);
     }
 
     return { totalRewards, annualizedReturns };
   }
 
   async syncStakingStats () {
-    log.info(`Syncing GlobalAggregateStats..`);
+    log.info(`Syncing StakingStatsSnapshot..`);
     const aggregatedStats = await StakingStatsSnapshot.findOne();
     const fromBlock = aggregatedStats ? aggregatedStats.latestBlockProcessed + 1 : 0;
     log.info(`Computing global aggregated stats from block ${fromBlock}`);
@@ -191,20 +181,17 @@ class StakingStats {
 
   async syncWithdrawnRewards() {
     log.info(`Syncing RewardWithdrawn..`);
-    log.info(`Syncing RewardWithdrawn..`);
 
-    const fromBlock = getLastProcessedBlock(WithdrawnReward);
+    const fromBlock = await getLastProcessedBlock(WithdrawnReward);
     log.info(`Starting from block ${fromBlock}`);
     const rewardWithdrawnEvents = await this.getRewardWithdrawn(fromBlock);
-
     await Promise.all(rewardWithdrawnEvents.map(async event => {
       const block = await this.web3.eth.getBlock(event.blockNumber);
       event.timestamp = block.timestamp;
-      event.blockNumber = block.number;
     }));
-
-    log.info(`Inserting ${rewardWithdrawnEvents.length} WithdrawnRewards`);
-    await insertManyIgnoreDuplicates(WithdrawnReward, rewardWithdrawnEvents);
+    const flattenedEvents = rewardWithdrawnEvents.map(flattenEvent);
+    log.info(`Detected ${rewardWithdrawnEvents.length} new RewardWithdrawn events.`);
+    await insertManyIgnoreDuplicates(WithdrawnReward, flattenedEvents);
   }
 
   async syncStakerSnapshots () {
