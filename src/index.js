@@ -5,6 +5,7 @@ const NexusContractLoader = require('./nexus-contract-loader');
 const Web3 = require('web3');
 const { runForever } = require('./utils');
 const log = require('./log');
+const mongoose = require('mongoose');
 
 async function startServer (app, port) {
   return new Promise(resolve => app.listen(port, resolve));
@@ -31,6 +32,12 @@ async function init () {
   const syncFailureRetryInterval = parseInt(getEnv('SYNC_FAILURE_INTERVAL'));
   const annualizedDaysInterval = parseInt(getEnv('ANNUALIZED_DAYS_INTERVAL'));
   const network = getEnv('NETWORK', 'mainnet');
+  const MONGO_URL = getEnv('MONGO_URL', 'mainnet');
+
+
+  log.info('Connecting to database..');
+  const opts = { useNewUrlParser: true, useUnifiedTopology: true };
+  await mongoose.connect(MONGO_URL, opts);
 
   log.info(`Connecting to node at ${providerURL}..`);
   const web3 = new Web3(providerURL);
@@ -45,27 +52,33 @@ async function init () {
   log.info(`Chain-api listening on port ${PORT}`);
   log.info(`Launching regular data sync processes..`);
 
-  const backgroundStakingStatsSync = runForever(
-    () => chainDataAggregator.syncStakingStats(),
-    globalStatsSyncInterval,
-    syncFailureRetryInterval,
-    0,
-  );
+  const backgroundStakingStatsSync = log.runWithContinuationId(
+    'staking-stats-sync',
+    () => runForever(
+      () => chainDataAggregator.syncStakingStats(),
+      globalStatsSyncInterval,
+      syncFailureRetryInterval,
+      0,
+  ));
 
-  const backgroundWithdrawnRewardSync = runForever(
-    () => chainDataAggregator.syncWithdrawnRewards(),
-    globalStatsSyncInterval,
-    syncFailureRetryInterval,
-    0,
-  );
+  const backgroundWithdrawnRewardSync = log.runWithContinuationId(
+    'withdrawn-rewards-sync',
+    () => runForever(
+      () => chainDataAggregator.syncWithdrawnRewards(),
+      globalStatsSyncInterval,
+      syncFailureRetryInterval,
+      0,
+  ));
 
   const syncDailyDelay = 20000;
-  const backgroundStakerSnapshotsSync = runForever(
-    () => chainDataAggregator.syncStakerSnapshots(),
-    stakerSnapshotsSyncInterval,
-    syncFailureRetryInterval,
-    syncDailyDelay,
-  );
+  const backgroundStakerSnapshotsSync = log.runWithContinuationId(
+    'staker-snapshots-sync',
+    () => runForever(
+      () => chainDataAggregator.syncStakerSnapshots(),
+      stakerSnapshotsSyncInterval,
+      syncFailureRetryInterval,
+      syncDailyDelay,
+  ));
 
   await Promise.all([backgroundWithdrawnRewardSync, backgroundStakingStatsSync, backgroundStakerSnapshotsSync]);
 }
