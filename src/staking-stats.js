@@ -222,14 +222,14 @@ class StakingStats {
     const today = new Date();
     // normalize to midnight
     today.setHours(0, 0, 0, 0);
-    const fetchedDate = new Date();
+    const createdAt = new Date();
     const dailyStakerSnapshotRecords = allStakerSnapshots.map(({ staker, deposit, reward }) => {
       return {
         address: staker,
         deposit: deposit.toString(),
         reward: reward.toString(),
         timestamp: today.getTime(),
-        fetchedDate: fetchedDate };
+        createdAt: createdAt };
     });
 
     log.info(`Storing ${dailyStakerSnapshotRecords.length} daily staker deposits.`);
@@ -306,7 +306,7 @@ function stakerAnnualizedReturns (latestStakerSnapshots, currentReward, rewardWi
   }
 
   const firstStakerSnapshot = latestStakerSnapshots[0];
-  const startTime = firstStakerSnapshot.fetchedDate.getTime();
+  const startTime = firstStakerSnapshot.createdAt.getTime();
   const rewardsPostStartTime = rewardWithdrawnEvents
     .filter(rewardEvent => rewardEvent.timestamp * 1000 >= startTime)
     .map(event => new BN(event.returnValues.amount));
