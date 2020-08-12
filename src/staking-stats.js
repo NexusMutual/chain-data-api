@@ -65,7 +65,7 @@ class StakingStats {
     return { totalRewards, annualizedReturns };
   }
 
-  async getContractAnnualizedReturns (contractAddress) {
+  async getContractStats (contractAddress) {
     const rewards = await Reward.find({ contractAddress });
 
     const MIN_COVERS_COUNT = 5;

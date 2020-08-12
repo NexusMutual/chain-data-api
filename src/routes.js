@@ -12,10 +12,10 @@ const asyncRoute = route => (req, res) => {
 };
 
 /**
- * @param {ChainDataAggregator} chainDataAggregator
+ * @param {ChainDataAggregator} stakingStats
  * @return {app}
  */
-module.exports = (chainDataAggregator) => {
+module.exports = (stakingStats) => {
 
   const app = express();
 
@@ -26,9 +26,9 @@ module.exports = (chainDataAggregator) => {
     next();
   });
 
-  app.get('/stats/global', asyncRoute(async (req, res) => {
+  app.get('/staking/global-stats', asyncRoute(async (req, res) => {
 
-    const { totalStaked, coverPurchased, totalRewards, averageReturns, createdAt } = await chainDataAggregator.getGlobalAggregatedStats();
+    const { totalStaked, coverPurchased, totalRewards, averageReturns, createdAt } = await stakingStats.getGlobalAggregatedStats();
     res.json({
       totalStaked,
       coverPurchased,
@@ -38,19 +38,35 @@ module.exports = (chainDataAggregator) => {
     });
   }));
 
-  app.get('/stats/:member', asyncRoute(async (req, res) => {
-    const member = req.params.member;
-    log.info(`Fetching stats for member ${member}`);
-    if (!isValidEthereumAddress(member)) {
-      const errMessage = `Not a valid Ethereum address: ${member}`;
+  app.get('/staking/staker-stats/:staker', asyncRoute(async (req, res) => {
+    const staker = req.params.staker;
+    log.info(`Fetching stats for staker ${staker}`);
+    if (!isValidEthereumAddress(staker)) {
+      const errMessage = `Not a valid Ethereum address: ${staker}`;
       log.error(errMessage);
       return res.status(400).json({ message: errMessage });
     }
 
-    const { totalRewards, annualizedReturns } = await chainDataAggregator.getStakerStats(req.params.member);
+    const { totalRewards, annualizedReturns } = await stakingStats.getStakerStats(staker);
     res.json({
       totalRewards,
       annualizedReturns,
+    });
+  }));
+
+  app.get('/staking/contract-stats/:contract', asyncRoute(async (req, res) => {
+    const contract = req.params.contract;
+    log.info(`Fetching stats for contract ${contract}`);
+    if (!isValidEthereumAddress(contract)) {
+      const errMessage = `Not a valid Ethereum address: ${contract}`;
+      log.error(errMessage);
+      return res.status(400).json({ message: errMessage });
+    }
+
+    const { error, annualizedReturns } = await stakingStats.getContractStats(contract);
+    res.json({
+      annualizedReturns,
+      error,
     });
   }));
 
