@@ -12,7 +12,7 @@ const asyncRoute = route => (req, res) => {
 };
 
 /**
- * @param {ChainDataAggregator} stakingStats
+ * @param {StakingStats} stakingStats
  * @return {app}
  */
 module.exports = (stakingStats) => {
