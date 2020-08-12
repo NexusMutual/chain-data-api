@@ -8,7 +8,7 @@ const {
   Cover,
   StakerSnapshot,
   StakingStatsSnapshot,
-  WithdrawnReward
+  WithdrawnReward,
 } = require('./models');
 const { chunk, insertManyIgnoreDuplicates } = require('./utils');
 
@@ -23,13 +23,15 @@ class StakingStats {
 
   async getGlobalAggregatedStats () {
 
-    const globalAggregatedStats = await StakingStatsSnapshot.findOne();
+    const globalAggregatedStats = await StakingStatsSnapshot.findOne().sort({ latestBlockProcessed: -1 });
     const tokenPrice = await this.getCurrentTokenPrice('DAI');
     const stats = {
       totalStaked: getUSDValue(new BN(globalAggregatedStats.totalStaked), tokenPrice),
       coverPurchased: getUSDValue(new BN(globalAggregatedStats.coverPurchased), tokenPrice),
       totalRewards: getUSDValue(new BN(globalAggregatedStats.totalRewards), tokenPrice),
       averageReturns: globalAggregatedStats.averageReturns,
+      createdAt: globalAggregatedStats.createdAt,
+      latestBlockProcessed: globalAggregatedStats.latestBlockProcessed,
     };
     return stats;
   }
@@ -62,8 +64,8 @@ class StakingStats {
 
   async syncStakingStats () {
     log.info(`Syncing StakingStatsSnapshot..`);
-    const aggregatedStats = await StakingStatsSnapshot.findOne();
-    const fromBlock = aggregatedStats ? aggregatedStats.latestBlockProcessed + 1 : 0;
+    const latestAggregatedStats = await StakingStatsSnapshot.findOne().sort({ latestBlockProcessed: -1 });
+    const fromBlock = latestAggregatedStats ? latestAggregatedStats.latestBlockProcessed + 1 : 0;
     log.info(`Computing global aggregated stats from block ${fromBlock}`);
     const latestBlockProcessed = await this.web3.eth.getBlockNumber();
     log.info(`Latest block being processed: ${latestBlockProcessed}`);
@@ -80,10 +82,11 @@ class StakingStats {
       coverPurchased: coverPurchased.toString(),
       averageReturns,
       latestBlockProcessed,
+      createdAt: new Date(),
     };
 
     log.info(`Storing GlobalAggregatedStats values: ${JSON.stringify(newValues)}`);
-    await StakingStatsSnapshot.updateOne({}, newValues, { upsert: true });
+    await StakingStatsSnapshot.create(newValues);
   }
 
   async computeGlobalAverageReturns () {
@@ -179,7 +182,7 @@ class StakingStats {
     return totalNXMCoverPurchaseValue;
   }
 
-  async syncWithdrawnRewards() {
+  async syncWithdrawnRewards () {
     log.info(`Syncing RewardWithdrawn..`);
 
     const fromBlock = await getLastProcessedBlock(WithdrawnReward);
@@ -226,8 +229,7 @@ class StakingStats {
         deposit: deposit.toString(),
         reward: reward.toString(),
         timestamp: today.getTime(),
-        // toISOString() defaults to UTC timezone
-        fetchedDate: fetchedDate.toISOString() };
+        fetchedDate: fetchedDate };
     });
 
     log.info(`Storing ${dailyStakerSnapshotRecords.length} daily staker deposits.`);
@@ -304,7 +306,7 @@ function stakerAnnualizedReturns (latestStakerSnapshots, currentReward, rewardWi
   }
 
   const firstStakerSnapshot = latestStakerSnapshots[0];
-  const startTime = new Date(firstStakerSnapshot.fetchedDate).getTime();
+  const startTime = firstStakerSnapshot.fetchedDate.getTime();
   const rewardsPostStartTime = rewardWithdrawnEvents
     .filter(rewardEvent => rewardEvent.timestamp * 1000 >= startTime)
     .map(event => new BN(event.returnValues.amount));

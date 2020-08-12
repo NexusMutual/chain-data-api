@@ -45,7 +45,7 @@ async function init () {
   log.info(`Chain-api listening on port ${PORT}`);
   log.info(`Launching regular data sync processes..`);
 
-  const backgroundGlobalAggregateStatsSync = runForever(
+  const backgroundStakingStatsSync = runForever(
     () => chainDataAggregator.syncStakingStats(),
     globalStatsSyncInterval,
     syncFailureRetryInterval,
@@ -67,7 +67,7 @@ async function init () {
     syncDailyDelay,
   );
 
-  await Promise.all([backgroundWithdrawnRewardSync, backgroundGlobalAggregateStatsSync, backgroundStakerSnapshotsSync]);
+  await Promise.all([backgroundWithdrawnRewardSync, backgroundStakingStatsSync, backgroundStakerSnapshotsSync]);
 }
 
 init()

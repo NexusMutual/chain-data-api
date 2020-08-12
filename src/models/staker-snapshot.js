@@ -5,7 +5,7 @@ const stakerSnapshot = new mongoose.Schema({
   deposit: { type: String },
   reward: { type: String },
   timestamp: { type: Number },
-  fetchedDate: { type: String },
+  fetchedDate: { type: Date },
 });
 
 stakerSnapshot.index({ address: 1, timestamp: 1 }, { unique: true });

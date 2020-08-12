@@ -11,5 +11,5 @@ module.exports = {
   Reward,
   Cover,
   StakerSnapshot,
-  WithdrawnReward
+  WithdrawnReward,
 };
