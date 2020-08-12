@@ -65,13 +65,13 @@ class StakingStats {
     return { totalRewards, annualizedReturns };
   }
 
-  async getContractAnnualizedReturns(contractAddress) {
+  async getContractAnnualizedReturns (contractAddress) {
     const rewards = await Reward.find({ contractAddress });
 
     const MIN_COVERS_COUNT = 5;
     if (rewards.length < MIN_COVERS_COUNT) {
       return {
-        error: 'Not enough historical info.'
+        error: 'Not enough historical info.',
       };
     }
     const timestamps = rewards.map(r => r.timestamp);
@@ -216,8 +216,8 @@ class StakingStats {
         blockHash: event.blockHash,
         blockNumber: event.blockNumber,
         logIndex: event.logIndex,
-        transactionHash: event.transactionHash
-      }
+        transactionHash: event.transactionHash,
+      };
     });
     await insertManyIgnoreDuplicates(Cover, covers);
 
