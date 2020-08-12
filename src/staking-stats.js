@@ -173,8 +173,23 @@ class StakingStats {
   async syncTotalCoverPurchases (fromBlock) {
     const newCoverDetailsEvents = await this.getCoverDetailsEvents(fromBlock);
     log.info(`Detected ${newCoverDetailsEvents.length} new CoverDetailsEvent events.`);
-    const flattenedCoverDetailsEvents = newCoverDetailsEvents.map(flattenEvent);
-    await insertManyIgnoreDuplicates(Cover, flattenedCoverDetailsEvents);
+    const covers = newCoverDetailsEvents.map(flattenEvent).map(event => {
+      return {
+        coverId: event.cid,
+        contractAddress: event.scAdd,
+        sumAssured: event.sumAssured,
+        expiry: event.expiry,
+        premium: event.premium,
+        premiumNXM: event.premiumNXM,
+        currency: event.curr,
+
+        blockHash: event.blockHash,
+        blockNumber: event.blockNumber,
+        logIndex: event.logIndex,
+        transactionHash: event.transactionHash
+      }
+    });
+    await insertManyIgnoreDuplicates(Cover, covers);
 
     const coverDetailsEvents = await Cover.find();
     const premiumNXMValues = coverDetailsEvents.map(event => new BN(event.premiumNXM));
