@@ -14,6 +14,9 @@ const { chunk, insertManyIgnoreDuplicates } = require('./utils');
 
 const BN = new Web3().utils.BN;
 
+const STAKING_START_DATE = new Date('06-02-2020');
+const DAY_IN_SECONDS = 60 * 60 * 24;
+
 class StakingStats {
   constructor (nexusContractLoader, web3, annualizedReturnsDaysInterval) {
     this.nexusContractLoader = nexusContractLoader;
@@ -60,6 +63,33 @@ class StakingStats {
     }
 
     return { totalRewards, annualizedReturns };
+  }
+
+  async getContractAnnualizedReturns(contractAddress) {
+    const rewards = await Reward.find({ contractAddress });
+
+    const MIN_COVERS_COUNT = 5;
+    if (rewards.length < MIN_COVERS_COUNT) {
+      return {
+        error: 'Not enough historical info.'
+      };
+    }
+    const timestamps = rewards.map(r => r.timestamp);
+
+    const startTimestamp = Math.min(...timestamps);
+    const currentStake = await this.getContractStake(contractAddress);
+    const endTimestamp = Math.round(new Date().getTime() / 1000);
+    const periodInSeconds = endTimestamp - startTimestamp;
+
+    const periodInDays = periodInSeconds / DAY_IN_SECONDS;
+    const startingStake = parseInt(rewards.find(r => r.timestamp === startTimestamp).contractStake);
+
+    const averageStake = (parseInt(currentStake.toString()) + startingStake) / 2;
+    const rewardSumBN = rewards.map(reward => new BN(reward.amount)).reduce((a, b) => a.add(b), new BN('0'));
+    const rewardSum = parseInt(rewardSumBN.toString());
+
+    const apy = (1 + rewardSum / averageStake) ^ (365 / periodInDays) - 1;
+    return { annualizedReturns: apy };
   }
 
   async syncStakingStats () {
@@ -215,6 +245,11 @@ class StakingStats {
   async syncStakerSnapshots () {
     log.info(`Syncing daily staker deposits..`);
     const allStakedEvents = await Stake.find();
+    if (allStakedEvents.length === 0) {
+      log.info(`No stakes recorded. Skipping syncing staker snapshot sync until that is completed.`);
+      return;
+    }
+
     const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
     log.info(`There are ${allStakers.length} stakers to sync.`);
     const chunkSize = 50;

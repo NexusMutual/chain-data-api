@@ -4,6 +4,7 @@ const rewardSchema = new mongoose.Schema({
   timestamp: { type: Number },
   amount: { type: String },
   contractAddress: { type: String },
+  contractStake: { type: String },
 
   // source event fields
   blockHash: { type: String },
