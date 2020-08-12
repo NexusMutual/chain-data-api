@@ -11,7 +11,7 @@ if (!loggingSession) {
   loggingSession = createNamespace(LOGGING_NAMESPACE_NAME);
 }
 
-function runWithContinuationId(value, continuation) {
+function runWithContinuationId (value, continuation) {
   if (!value) {
     value = uuidv4();
   }
@@ -24,10 +24,9 @@ function runWithContinuationId(value, continuation) {
 }
 
 const continuationIdFormat = winston.format((info) => {
-  const continuationId = loggingSession.get(CONTINUATION_ID_VAR_NAME)
-  return {...info, continuationId };
+  const continuationId = loggingSession.get(CONTINUATION_ID_VAR_NAME);
+  return { ...info, continuationId };
 });
-
 
 const logger = winston.createLogger({
   format: winston.format.combine(winston.format.simple(), winston.format.timestamp(), continuationIdFormat()),

@@ -34,7 +34,6 @@ async function init () {
   const network = getEnv('NETWORK', 'mainnet');
   const MONGO_URL = getEnv('MONGO_URL', 'mainnet');
 
-
   log.info('Connecting to database..');
   const opts = { useNewUrlParser: true, useUnifiedTopology: true };
   await mongoose.connect(MONGO_URL, opts);
@@ -57,28 +56,24 @@ async function init () {
     () => runForever(
       () => chainDataAggregator.syncStakingStats(),
       globalStatsSyncInterval,
-      syncFailureRetryInterval,
-      0,
-  ));
+      syncFailureRetryInterval
+    ));
 
   const backgroundWithdrawnRewardSync = log.runWithContinuationId(
     'withdrawn-rewards-sync',
     () => runForever(
       () => chainDataAggregator.syncWithdrawnRewards(),
       globalStatsSyncInterval,
-      syncFailureRetryInterval,
-      0,
-  ));
+      syncFailureRetryInterval
+    ));
 
-  const syncDailyDelay = 20000;
   const backgroundStakerSnapshotsSync = log.runWithContinuationId(
     'staker-snapshots-sync',
     () => runForever(
       () => chainDataAggregator.syncStakerSnapshots(),
       stakerSnapshotsSyncInterval,
-      syncFailureRetryInterval,
-      syncDailyDelay,
-  ));
+      syncFailureRetryInterval
+    ));
 
   await Promise.all([backgroundWithdrawnRewardSync, backgroundStakingStatsSync, backgroundStakerSnapshotsSync]);
 }
