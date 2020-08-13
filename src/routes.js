@@ -28,7 +28,7 @@ module.exports = (stakingStats) => {
 
   app.get('/staking/global-stats', asyncRoute(async (req, res) => {
 
-    const { totalStaked, coverPurchased, totalRewards, averageReturns, createdAt } = await stakingStats.getGlobalAggregatedStats();
+    const { totalStaked, coverPurchased, totalRewards, averageReturns, createdAt } = await stakingStats.getGlobalStats();
     res.json({
       totalStaked,
       coverPurchased,

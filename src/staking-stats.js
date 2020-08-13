@@ -11,11 +11,11 @@ const {
   StakingStatsSnapshot,
   WithdrawnReward,
 } = require('./models');
-const { chunk, insertManyIgnoreDuplicates, datesRange } = require('./utils');
+const { chunk, insertManyIgnoreDuplicates, datesRange, addDays } = require('./utils');
 
 const BN = new Web3().utils.BN;
 
-const STAKING_START_DATE = new Date('06-30-2020');
+const STAKING_START_DATE = new Date('08-10-2020');
 const DAY_IN_SECONDS = 60 * 60 * 24;
 
 class StakingStats {
@@ -26,7 +26,7 @@ class StakingStats {
     this.etherscanAPIKey = etherscanAPIKey;
   }
 
-  async getGlobalAggregatedStats () {
+  async getGlobalStats () {
 
     const globalAggregatedStats = await StakingStatsSnapshot.findOne().sort({ latestBlockProcessed: -1 });
     const tokenPrice = await this.getCurrentTokenPrice('DAI');
@@ -51,12 +51,13 @@ class StakingStats {
     const currentReward = await pooledStaking.stakerReward(staker);
     const totalRewards = totalWithdrawnAmounts.add(currentReward).toString();
 
+    const now = Date();
+    now.setHours(0, 0, 0, 0);
+    const startTimestamp = addDays(now, -this.annualizedReturnsDaysInterval).getTime();
     const dailyStakerSnapshots = await StakerSnapshot
-      .find({ address: staker })
-      .sort({ timestamp: -1 })
-      .limit(annualizedDaysInterval);
+      .find({ address: staker, timestamp: { $gte: startTimestamp } })
+      .sort({ timestamp: -1 });
 
-    dailyStakerSnapshots.reverse();
     let annualizedReturns;
     if (dailyStakerSnapshots.length >= this.annualizedReturnsDaysInterval) {
       annualizedReturns = stakerAnnualizedReturns(dailyStakerSnapshots, currentReward, withdrawnRewards, annualizedDaysInterval);
