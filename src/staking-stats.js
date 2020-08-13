@@ -311,6 +311,7 @@ class StakingStats {
         deposit: deposit.toString(),
         reward: reward.toString(),
         timestamp: today.getTime(),
+        blockNumber,
         createdAt: createdAt };
     });
 
@@ -321,8 +322,8 @@ class StakingStats {
   async getBlockNumbersByTimestamps (timestamps) {
 
     const blockNumberByTimestamp = {};
-    const ETHERSCAN_REQ_PER_SECOND = 5;
-    const chunks = chunk(timestamps, ETHERSCAN_REQ_PER_SECOND);
+    const ETHERSCAN_REQ_PER_BURST = 5;
+    const chunks = chunk(timestamps, ETHERSCAN_REQ_PER_BURST);
     for (const chunk of chunks) {
       log.info(`Fetching block numbers for timestamps: ${JSON.stringify(chunk)}`);
       await Promise.all(chunk.map(async timestamp => {

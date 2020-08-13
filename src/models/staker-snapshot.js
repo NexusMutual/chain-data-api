@@ -6,6 +6,7 @@ const stakerSnapshot = new mongoose.Schema({
   reward: { type: String },
   timestamp: { type: Number },
   createdAt: { type: Date },
+  blockNumber: { type: Number },
 });
 
 stakerSnapshot.index({ address: 1, timestamp: 1 }, { unique: true });
