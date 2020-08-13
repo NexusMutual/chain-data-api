@@ -32,11 +32,12 @@ async function init () {
   const syncFailureRetryInterval = parseInt(getEnv('SYNC_FAILURE_INTERVAL'));
   const annualizedDaysInterval = parseInt(getEnv('ANNUALIZED_DAYS_INTERVAL'));
   const network = getEnv('NETWORK', 'mainnet');
-  const MONGO_URL = getEnv('MONGO_URL', 'mainnet');
+  const mongoURL = getEnv('MONGO_URL', 'mainnet');
+  const etherscanAPIKey = getEnv('ETHERSCAN_API_KEY');
 
   log.info('Connecting to database..');
   const opts = { useNewUrlParser: true, useUnifiedTopology: true };
-  await mongoose.connect(MONGO_URL, opts);
+  await mongoose.connect(mongoURL, opts);
 
   log.info(`Connecting to node at ${providerURL}..`);
   const web3 = new Web3(providerURL);
@@ -45,7 +46,7 @@ async function init () {
   const nexusContractLoader = new NexusContractLoader(network, versionDataURL, web3.eth.currentProvider);
   await nexusContractLoader.init();
 
-  const chainDataAggregator = new StakingStats(nexusContractLoader, web3, annualizedDaysInterval);
+  const chainDataAggregator = new StakingStats(nexusContractLoader, web3, annualizedDaysInterval, etherscanAPIKey);
   const app = routes(chainDataAggregator);
   await startServer(app, PORT);
   log.info(`Chain-api listening on port ${PORT}`);

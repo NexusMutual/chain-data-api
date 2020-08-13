@@ -10,18 +10,19 @@ const {
   StakingStatsSnapshot,
   WithdrawnReward,
 } = require('./models');
-const { chunk, insertManyIgnoreDuplicates } = require('./utils');
+const { chunk, insertManyIgnoreDuplicates, datesRange } = require('./utils');
 
 const BN = new Web3().utils.BN;
 
-const STAKING_START_DATE = new Date('06-02-2020');
+const STAKING_START_DATE = new Date('06-30-2020');
 const DAY_IN_SECONDS = 60 * 60 * 24;
 
 class StakingStats {
-  constructor (nexusContractLoader, web3, annualizedReturnsDaysInterval) {
+  constructor (nexusContractLoader, web3, annualizedReturnsDaysInterval, etherscanAPIKey) {
     this.nexusContractLoader = nexusContractLoader;
     this.web3 = web3;
     this.annualizedReturnsDaysInterval = annualizedReturnsDaysInterval;
+    this.etherscanAPIKey = etherscanAPIKey;
   }
 
   async getGlobalAggregatedStats () {
@@ -252,6 +253,27 @@ class StakingStats {
 
     const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
     log.info(`There are ${allStakers.length} stakers to sync.`);
+
+    const latestStakerSnapshot = StakerSnapshot.findOne().sort({ timestamp: -1 });
+
+    const startDate = latestStakerSnapshot ? new Date(latestStakerSnapshot.timestamp) : STAKING_START_DATE;
+    const endDate = new Date();
+
+    log.info(JSON.stringify({startDate, endDate }));
+    const dates = datesRange(new Date(latestStakerSnapshot.timestamp), endDate);
+    log.info(`Processing range: ${JSON.stringify(datesRange)}`);
+
+    const blockNumbersByTimestamp = await this.getBlockNumbersByTimestamps(dates.map(d => d.getTime()));
+
+    for (let date of dates) {
+      const blockNumber = blockNumbersByTimestamp[date.getTime()];
+      log.info(`Syncing for date ${date} and block ${blockNumber}`);
+      await this.syncStakerSnapshotsForBlock(allStakers, blockNumber, date)
+    }
+  }
+
+  async syncStakerSnapshotsForBlock (allStakers, blockNumber, date) {
+
     const chunkSize = 50;
     const chunks = chunk(allStakers, chunkSize);
     log.info(`To be processed in ${chunks.length} chunks of max size ${chunkSize}`);
@@ -268,8 +290,7 @@ class StakingStats {
       }));
       allStakerSnapshots.push(...stakerSnapshot);
     }
-
-    const today = new Date();
+    const today = date;
     // normalize to midnight
     today.setHours(0, 0, 0, 0);
     const createdAt = new Date();
@@ -284,6 +305,26 @@ class StakingStats {
 
     log.info(`Storing ${dailyStakerSnapshotRecords.length} daily staker deposits.`);
     await insertManyIgnoreDuplicates(StakerSnapshot, dailyStakerSnapshotRecords);
+  }
+
+
+  async getBlockNumbersByTimestamps(timestamps) {
+    const blockNumberByTimestamp = {};
+     await Promise.all(timestamps.map(async timestamp => {
+      const blockNumber = await this.getBlockNumberByTimestamp(timestamp);
+      blockNumberByTimestamp[timestamp] = blockNumber;
+    }));
+
+    return blockNumberByTimestamp;
+  }
+
+  async getBlockNumberByTimestamp(timestamp) {
+    const url = `https://api.etherscan.io/api?module=block&action=getblocknobytime&timestamp=${timestamp}&closest=after&apikey=${this.etherscanAPIKey}`;
+    const { result, message } = await fetch(url).then(res => res.json());
+    if(message !== 'OK') {
+      throw new Error(message);
+    }
+    return parseInt(result);
   }
 
   async getContractStake (contractAddress) {

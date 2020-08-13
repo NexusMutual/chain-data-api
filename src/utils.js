@@ -23,9 +23,8 @@ async function to (promise) {
   });
 }
 
-async function runForever (f, interval, errorInterval, startDelay) {
-  log.info(`Running forever with interval = ${interval}, errorInterval = ${errorInterval}, startDelay = ${startDelay}`);
-  await sleep(startDelay);
+async function runForever (f, interval, errorInterval) {
+  log.info(`Running forever with interval = ${interval}, errorInterval = ${errorInterval}`);
   while (true) {
     const [, error] = await to(f());
     if (error) {
@@ -55,6 +54,23 @@ async function getLastProcessedBlock (model) {
   return lastProcessedItem ? lastProcessedItem.blockNumber : 0;
 }
 
+function addDays (date, days) {
+  var date = new Date(date.valueOf());
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function datesRange (startDate, endDate) {
+  const range = [];
+
+  let currentDate = startDate;
+  while (currentDate.getTime() < endDate.getTime()) {
+    range.push(currentDate);
+    currentDate = addDays(currentDate, 1);
+  }
+  return range;
+}
+
 module.exports = {
   hex,
   sleep,
@@ -63,4 +79,6 @@ module.exports = {
   insertManyIgnoreDuplicates,
   getLastProcessedBlock,
   to,
+  datesRange,
+  addDays
 };
