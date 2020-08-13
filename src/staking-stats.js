@@ -1,7 +1,8 @@
 const Web3 = require('web3');
 const { toBN } = new Web3().utils;
 const log = require('./log');
-const { hex, getLastProcessedBlock } = require('./utils');
+const fetch = require('node-fetch');
+const { hex, getLastProcessedBlock, flattenEvent, sleep } = require('./utils');
 const {
   Stake,
   Reward,
@@ -254,21 +255,30 @@ class StakingStats {
     const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
     log.info(`There are ${allStakers.length} stakers to sync.`);
 
-    const latestStakerSnapshot = StakerSnapshot.findOne().sort({ timestamp: -1 });
+    const latestStakerSnapshot = await StakerSnapshot.findOne().sort({ timestamp: -1 });
 
     const startDate = latestStakerSnapshot ? new Date(latestStakerSnapshot.timestamp) : STAKING_START_DATE;
     const endDate = new Date();
+    endDate.setHours(0, 0, 0, 0);
 
-    log.info(JSON.stringify({startDate, endDate }));
-    const dates = datesRange(new Date(latestStakerSnapshot.timestamp), endDate);
-    log.info(`Processing range: ${JSON.stringify(datesRange)}`);
+    log.info(JSON.stringify({ startDate, endDate }));
+    const dates = datesRange(startDate, endDate);
+    log.info(`Processing range: ${JSON.stringify(dates)}`);
 
-    const blockNumbersByTimestamp = await this.getBlockNumbersByTimestamps(dates.map(d => d.getTime()));
+    let blockNumbersByTimestamp = {};
+    if (dates.length > 1) {
+      log.info(`Historical data is missing for ${dates.length - 1}. Fetching past block numbers to process.`);
+      blockNumbersByTimestamp = await this.getBlockNumbersByTimestamps(dates.map(d => d.getTime()));
+    }
 
-    for (let date of dates) {
+    const latestBlock = await this.web3.eth.getBlock('latest');
+    log.info(`For today ${endDate} overriding with the latest block number: ${latestBlock.number}`);
+    blockNumbersByTimestamp[endDate] = latestBlock.number;
+
+    for (const date of dates) {
       const blockNumber = blockNumbersByTimestamp[date.getTime()];
       log.info(`Syncing for date ${date} and block ${blockNumber}`);
-      await this.syncStakerSnapshotsForBlock(allStakers, blockNumber, date)
+      await this.syncStakerSnapshotsForBlock(allStakers, blockNumber, date);
     }
   }
 
@@ -281,6 +291,7 @@ class StakingStats {
     const pooledStaking = this.nexusContractLoader.instance('PS');
     const allStakerSnapshots = [];
     for (const chunk of chunks) {
+      log.info(`Processing staker chunk of size ${chunk.length} for ${blockNumber} and date ${date}`);
       const stakerSnapshot = await Promise.all(chunk.map(async staker => {
         const [deposit, reward] = await Promise.all([
           pooledStaking.stakerDeposit(staker),
@@ -307,22 +318,28 @@ class StakingStats {
     await insertManyIgnoreDuplicates(StakerSnapshot, dailyStakerSnapshotRecords);
   }
 
+  async getBlockNumbersByTimestamps (timestamps) {
 
-  async getBlockNumbersByTimestamps(timestamps) {
     const blockNumberByTimestamp = {};
-     await Promise.all(timestamps.map(async timestamp => {
-      const blockNumber = await this.getBlockNumberByTimestamp(timestamp);
-      blockNumberByTimestamp[timestamp] = blockNumber;
-    }));
-
+    const ETHERSCAN_REQ_PER_SECOND = 5;
+    const chunks = chunk(timestamps, ETHERSCAN_REQ_PER_SECOND);
+    for (const chunk of chunks) {
+      log.info(`Fetching block numbers for timestamps: ${JSON.stringify(chunk)}`);
+      await Promise.all(chunk.map(async timestamp => {
+        const blockNumber = await this.getBlockNumberByTimestamp(timestamp);
+        blockNumberByTimestamp[timestamp] = blockNumber;
+      }));
+      await sleep(1000);
+    }
     return blockNumberByTimestamp;
   }
 
-  async getBlockNumberByTimestamp(timestamp) {
+  async getBlockNumberByTimestamp (timestampInMillis) {
+    const timestamp = Math.floor(timestampInMillis / 1000);
     const url = `https://api.etherscan.io/api?module=block&action=getblocknobytime&timestamp=${timestamp}&closest=after&apikey=${this.etherscanAPIKey}`;
     const { result, message } = await fetch(url).then(res => res.json());
-    if(message !== 'OK') {
-      throw new Error(message);
+    if (message !== 'OK') {
+      throw new Error(`${message}: ${result}`);
     }
     return parseInt(result);
   }
@@ -370,10 +387,6 @@ class StakingStats {
     const tokenPrice = mcr.calculateTokenPrice(hex(currency));
     return tokenPrice;
   }
-}
-
-function flattenEvent (event) {
-  return { ...event, ...event.returnValues };
 }
 
 /**

@@ -57,7 +57,7 @@ async function init () {
     () => runForever(
       () => chainDataAggregator.syncStakingStats(),
       globalStatsSyncInterval,
-      syncFailureRetryInterval
+      syncFailureRetryInterval,
     ));
 
   const backgroundWithdrawnRewardSync = log.runWithContinuationId(
@@ -65,7 +65,7 @@ async function init () {
     () => runForever(
       () => chainDataAggregator.syncWithdrawnRewards(),
       globalStatsSyncInterval,
-      syncFailureRetryInterval
+      syncFailureRetryInterval,
     ));
 
   const backgroundStakerSnapshotsSync = log.runWithContinuationId(
@@ -73,7 +73,7 @@ async function init () {
     () => runForever(
       () => chainDataAggregator.syncStakerSnapshots(),
       stakerSnapshotsSyncInterval,
-      syncFailureRetryInterval
+      syncFailureRetryInterval,
     ));
 
   await Promise.all([backgroundWithdrawnRewardSync, backgroundStakingStatsSync, backgroundStakerSnapshotsSync]);

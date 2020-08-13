@@ -71,6 +71,10 @@ function datesRange (startDate, endDate) {
   return range;
 }
 
+function flattenEvent (event) {
+  return { ...event, ...event.returnValues };
+}
+
 module.exports = {
   hex,
   sleep,
@@ -80,5 +84,6 @@ module.exports = {
   getLastProcessedBlock,
   to,
   datesRange,
-  addDays
+  addDays,
+  flattenEvent,
 };
