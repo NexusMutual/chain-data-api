@@ -271,9 +271,9 @@ class StakingStats {
       blockNumbersByTimestamp = await this.getBlockNumbersByTimestamps(dates.map(d => d.getTime()));
     }
 
-    const latestBlock = await this.web3.eth.getBlock('latest');
-    log.info(`For today ${endDate} overriding with the latest block number: ${latestBlock.number}`);
-    blockNumbersByTimestamp[endDate] = latestBlock.number;
+    const latestBlockNumber = await this.web3.eth.getBlockNumber();
+    log.info(`For today ${endDate} overriding with the latest block number: ${latestBlockNumber}`);
+    blockNumbersByTimestamp[endDate] = latestBlockNumber;
 
     for (const date of dates) {
       const blockNumber = blockNumbersByTimestamp[date.getTime()];
@@ -288,14 +288,14 @@ class StakingStats {
     const chunks = chunk(allStakers, chunkSize);
     log.info(`To be processed in ${chunks.length} chunks of max size ${chunkSize}`);
 
-    const pooledStaking = this.nexusContractLoader.instance('PS');
+    const pooledStaking = this.nexusContractLoader.web3Instance('PS');
     const allStakerSnapshots = [];
     for (const chunk of chunks) {
       log.info(`Processing staker chunk of size ${chunk.length} for ${blockNumber} and date ${date}`);
       const stakerSnapshot = await Promise.all(chunk.map(async staker => {
         const [deposit, reward] = await Promise.all([
-          pooledStaking.stakerDeposit(staker),
-          pooledStaking.stakerReward(staker),
+          pooledStaking.methods.stakerDeposit(staker).call(undefined, blockNumber),
+          pooledStaking.methods.stakerReward(staker).call(undefined, blockNumber),
         ]);
         return { staker, deposit, reward };
       }));

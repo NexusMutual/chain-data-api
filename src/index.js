@@ -43,7 +43,7 @@ async function init () {
   const web3 = new Web3(providerURL);
   await web3.eth.net.isListening();
 
-  const nexusContractLoader = new NexusContractLoader(network, versionDataURL, web3.eth.currentProvider);
+  const nexusContractLoader = new NexusContractLoader(network, versionDataURL, web3);
   await nexusContractLoader.init();
 
   const chainDataAggregator = new StakingStats(nexusContractLoader, web3, annualizedDaysInterval, etherscanAPIKey);

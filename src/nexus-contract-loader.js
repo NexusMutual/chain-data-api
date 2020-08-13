@@ -5,10 +5,11 @@ const { setupLoader } = require('@openzeppelin/contract-loader');
 
 class NexusContractLoader {
 
-  constructor (chain, versionDataURL, provider) {
+  constructor (chain, versionDataURL, web3) {
     this.chain = chain;
     this.versionDataURL = versionDataURL;
-    this.provider = provider;
+    this.web3 = web3;
+    this.provider = web3.eth.currentProvider;
   }
 
   async init () {
@@ -36,6 +37,12 @@ class NexusContractLoader {
     const abi = this.data[code].contractAbi;
     const address = this.address(code);
     return this.loader.fromABI(abi, null, address);
+  }
+
+  web3Instance (code) {
+    const abi = this.data[code].contractAbi;
+    const address = this.address(code);
+    return new this.web3.eth.Contract(abi, address);
   }
 }
 
