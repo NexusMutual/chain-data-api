@@ -15,7 +15,7 @@ const { chunk, insertManyIgnoreDuplicates, datesRange, addDays, dayUTCFloor } = 
 
 const BN = new Web3().utils.BN;
 
-const STAKING_START_DATE = new Date('08-13-2020');
+const STAKING_START_DATE = new Date('06-31-2020');
 const DAY_IN_SECONDS = 60 * 60 * 24;
 
 class StakingStats {
