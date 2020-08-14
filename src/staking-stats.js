@@ -11,11 +11,11 @@ const {
   StakingStatsSnapshot,
   WithdrawnReward,
 } = require('./models');
-const { chunk, insertManyIgnoreDuplicates, datesRange, addDays } = require('./utils');
+const { chunk, insertManyIgnoreDuplicates, datesRange, addDays, dayUTCFloor } = require('./utils');
 
 const BN = new Web3().utils.BN;
 
-const STAKING_START_DATE = new Date('08-10-2020');
+const STAKING_START_DATE = new Date('08-13-2020');
 const DAY_IN_SECONDS = 60 * 60 * 24;
 
 class StakingStats {
@@ -51,9 +51,8 @@ class StakingStats {
     const currentReward = await pooledStaking.stakerReward(staker);
     const totalRewards = totalWithdrawnAmounts.add(currentReward).toString();
 
-    const now = Date();
-    now.setHours(0, 0, 0, 0);
-    const startTimestamp = addDays(now, -this.annualizedReturnsDaysInterval).getTime();
+    const currentDay = dayUTCFloor(new Date());
+    const startTimestamp = addDays(currentDay, -this.annualizedReturnsDaysInterval).getTime();
     const dailyStakerSnapshots = await StakerSnapshot
       .find({ address: staker, timestamp: { $gte: startTimestamp } })
       .sort({ timestamp: -1 });
@@ -259,8 +258,7 @@ class StakingStats {
     const latestStakerSnapshot = await StakerSnapshot.findOne().sort({ timestamp: -1 });
 
     const startDate = latestStakerSnapshot ? new Date(latestStakerSnapshot.timestamp) : STAKING_START_DATE;
-    const endDate = new Date();
-    endDate.setHours(0, 0, 0, 0);
+    const endDate = dayUTCFloor(new Date());
 
     log.info(JSON.stringify({ startDate, endDate }));
     const dates = datesRange(startDate, endDate);
@@ -274,7 +272,7 @@ class StakingStats {
 
     const latestBlockNumber = await this.web3.eth.getBlockNumber();
     log.info(`For today ${endDate} overriding with the latest block number: ${latestBlockNumber}`);
-    blockNumbersByTimestamp[endDate] = latestBlockNumber;
+    blockNumbersByTimestamp[endDate.getTime()] = latestBlockNumber;
 
     for (const date of dates) {
       const blockNumber = blockNumbersByTimestamp[date.getTime()];
@@ -302,9 +300,7 @@ class StakingStats {
       }));
       allStakerSnapshots.push(...stakerSnapshot);
     }
-    const today = date;
-    // normalize to midnight
-    today.setHours(0, 0, 0, 0);
+    const today = dayUTCFloor(date);
     const createdAt = new Date();
     const dailyStakerSnapshotRecords = allStakerSnapshots.map(({ staker, deposit, reward }) => {
       return {
@@ -325,12 +321,23 @@ class StakingStats {
     const blockNumberByTimestamp = {};
     const ETHERSCAN_REQ_PER_BURST = 5;
     const chunks = chunk(timestamps, ETHERSCAN_REQ_PER_BURST);
-    for (const chunk of chunks) {
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
       log.info(`Fetching block numbers for timestamps: ${JSON.stringify(chunk)}`);
-      await Promise.all(chunk.map(async timestamp => {
-        const blockNumber = await this.getBlockNumberByTimestamp(timestamp);
-        blockNumberByTimestamp[timestamp] = blockNumber;
-      }));
+
+      try {
+        await Promise.all(chunk.map(async timestamp => {
+          const blockNumber = await this.getBlockNumberByTimestamp(timestamp);
+          blockNumberByTimestamp[timestamp] = blockNumber;
+        }));
+      } catch (e) {
+        const backoffTime = 10000;
+        log.error(`Failed to fetch block numbers: ${e.stack}. Sleeping for ${backoffTime} and retrying same chunk.`);
+        await sleep(backoffTime);
+        i--;
+      }
+
       await sleep(1000);
     }
     return blockNumberByTimestamp;

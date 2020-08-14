@@ -64,7 +64,7 @@ function datesRange (startDate, endDate) {
   const range = [];
 
   let currentDate = startDate;
-  while (currentDate.getTime() < endDate.getTime()) {
+  while (currentDate.getTime() <= endDate.getTime()) {
     range.push(currentDate);
     currentDate = addDays(currentDate, 1);
   }
@@ -73,6 +73,12 @@ function datesRange (startDate, endDate) {
 
 function flattenEvent (event) {
   return { ...event, ...event.returnValues };
+}
+
+function dayUTCFloor (date) {
+  const floor = new Date(date.getTime());
+  floor.setUTCHours(0, 0, 0, 0);
+  return floor;
 }
 
 module.exports = {
@@ -85,5 +91,6 @@ module.exports = {
   to,
   datesRange,
   addDays,
+  dayUTCFloor,
   flattenEvent,
 };
