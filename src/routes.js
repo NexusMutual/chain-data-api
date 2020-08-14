@@ -1,5 +1,6 @@
 const express = require('express');
 const log = require('./log');
+const cors = require('cors');
 
 const asyncRoute = route => (req, res) => {
   route(req, res).catch(e => {
@@ -20,11 +21,21 @@ module.exports = (stakingStats) => {
   const app = express();
 
   app.use((req, res, next) => {
-    console.log(`${req.method} ${req.originalUrl}`);
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'x-api-key');
+    log.info(`${req.method} ${req.originalUrl}`);
     next();
   });
+
+  const whitelist = ['https://nexusmutual.io'];
+  const corsOptions = {
+    origin: (origin, callback) => {
+      if (whitelist.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  };
+  app.use(cors(corsOptions));
 
   app.get('/staking/global-stats', asyncRoute(async (req, res) => {
 
