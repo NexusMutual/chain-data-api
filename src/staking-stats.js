@@ -29,7 +29,7 @@ class StakingStats {
 
   async getGlobalStats () {
 
-    const globalAggregatedStats = await StakingStatsSnapshot.findOne().sort({ latestBlockProcessed: -1 });
+    const globalAggregatedStats = await StakingStatsSnapshot.findOne().sort({ blockNumber: -1 });
     const tokenPrice = await this.getCurrentTokenPrice('DAI');
     const stats = {
       totalStaked: getUSDValue(new BN(globalAggregatedStats.totalStaked), tokenPrice),
@@ -37,7 +37,7 @@ class StakingStats {
       totalRewards: getUSDValue(new BN(globalAggregatedStats.totalRewards), tokenPrice),
       averageReturns: globalAggregatedStats.averageReturns,
       createdAt: globalAggregatedStats.createdAt,
-      latestBlockProcessed: globalAggregatedStats.latestBlockProcessed,
+      blockNumber: globalAggregatedStats.blockNumber,
     };
     return stats;
   }
@@ -97,11 +97,11 @@ class StakingStats {
 
   async syncStakingStats () {
     log.info(`Syncing StakingStatsSnapshot..`);
-    const latestAggregatedStats = await StakingStatsSnapshot.findOne().sort({ latestBlockProcessed: -1 });
-    const fromBlock = latestAggregatedStats ? latestAggregatedStats.latestBlockProcessed + 1 : 0;
+    const latestAggregatedStats = await StakingStatsSnapshot.findOne().sort({ blockNumber: -1 });
+    const fromBlock = latestAggregatedStats ? latestAggregatedStats.blockNumber + 1 : 0;
     log.info(`Computing global aggregated stats from block ${fromBlock}`);
-    const latestBlockProcessed = await this.web3.eth.getBlockNumber();
-    log.info(`Latest block being processed: ${latestBlockProcessed}`);
+    const blockNumber = await this.web3.eth.getBlockNumber();
+    log.info(`Latest block being processed: ${blockNumber}`);
 
     const [totalRewards, totalStaked, coverPurchased] = await Promise.all([
       this.syncTotalRewards(fromBlock),
@@ -114,7 +114,7 @@ class StakingStats {
       totalRewards: totalRewards.toString(),
       coverPurchased: coverPurchased.toString(),
       averageReturns,
-      latestBlockProcessed,
+      blockNumber,
       createdAt: new Date(),
     };
 

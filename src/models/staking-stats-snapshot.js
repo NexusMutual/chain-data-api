@@ -5,7 +5,7 @@ const stakingStatsSnapshotSchema = new mongoose.Schema({
   coverPurchased: String,
   totalRewards: String,
   averageReturns: String,
-  latestBlockProcessed: Number,
+  blockNumber: Number,
   createdAt: Date,
 });
 module.exports = mongoose.model('StakingStatsSnapshot', stakingStatsSnapshotSchema);
