@@ -8,7 +8,7 @@ const CHAIN = {
   3: 'ropsten',
   4: 'rinkeby',
   42: 'kovan',
-}
+};
 
 class NexusContractLoader {
 

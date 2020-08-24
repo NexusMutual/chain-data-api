@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const stakerSnapshot = new mongoose.Schema({
-  address: { type: String },
+  stakerAddress: { type: String },
   deposit: { type: String },
   reward: { type: String },
   timestamp: { type: Number },

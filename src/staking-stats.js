@@ -302,7 +302,7 @@ class StakingStats {
     const createdAt = new Date();
     const dailyStakerSnapshotRecords = allStakerSnapshots.map(({ staker, deposit, reward }) => {
       return {
-        address: staker,
+        stakerAddress: staker,
         deposit: deposit.toString(),
         reward: reward.toString(),
         timestamp: today.getTime(),
