@@ -1,7 +1,6 @@
 const winston = require('winston');
 
 const { getNamespace, createNamespace } = require('cls-hooked');
-const uuidv4 = require('uuid/v4');
 
 const LOGGING_NAMESPACE_NAME = 'chain-data-api-log';
 const CONTINUATION_ID_VAR_NAME = 'continuationId';
@@ -12,9 +11,6 @@ if (!loggingSession) {
 }
 
 function runWithContinuationId (value, continuation) {
-  if (!value) {
-    value = uuidv4();
-  }
   let returnValue;
   loggingSession.run(() => {
     loggingSession.set(CONTINUATION_ID_VAR_NAME, value);
