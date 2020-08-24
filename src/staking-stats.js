@@ -24,6 +24,7 @@ class StakingStats {
     this.web3 = web3;
     this.annualizedReturnsDaysInterval = annualizedReturnsDaysInterval;
     this.etherscanAPIKey = etherscanAPIKey;
+    this.blockCache = {};
   }
 
   async getGlobalStats () {
@@ -162,7 +163,7 @@ class StakingStats {
     const flattenedRewardedEvents = newRewardedEvents.map(flattenEvent);
 
     await Promise.all(flattenedRewardedEvents.map(async event => {
-      const block = await this.web3.eth.getBlock(event.blockNumber);
+      const block = await this.getBlock(event.blockNumber);
       event.timestamp = block.timestamp;
     }));
 
@@ -183,10 +184,7 @@ class StakingStats {
     await insertManyIgnoreDuplicates(Stake, flattenedStakedEvents);
 
     const stakedEvents = await Stake.find();
-    const contractSet = new Set();
-    for (const stakedEvent of stakedEvents) {
-      contractSet.add(stakedEvent.contractAddress);
-    }
+    const contractSet = new Set(stakedEvents.map(event => event.contractAddress));
     const contractList = Array.from(contractSet);
     log.info(`A set of ${contractList.length} contracts currently have stakes.`);
     const contractStakes = await Promise.all(contractList.map(contractAddress => {
@@ -236,7 +234,7 @@ class StakingStats {
     log.info(`Starting from block ${fromBlock}`);
     const rewardWithdrawnEvents = await this.getRewardWithdrawn(fromBlock);
     await Promise.all(rewardWithdrawnEvents.map(async event => {
-      const block = await this.web3.eth.getBlock(event.blockNumber);
+      const block = await this.getBlock(event.blockNumber);
       event.timestamp = block.timestamp;
     }));
     const flattenedEvents = rewardWithdrawnEvents.map(flattenEvent);
@@ -266,7 +264,7 @@ class StakingStats {
 
     let blockNumbersByTimestamp = {};
     if (dates.length > 1) {
-      log.info(`Historical data is missing for ${dates.length - 1}. Fetching past block numbers to process.`);
+      log.info(`Historical data is missing for ${dates.length - 1} days. Fetching past block numbers to process.`);
       blockNumbersByTimestamp = await this.getBlockNumbersByTimestamps(dates.map(d => d.getTime()));
     }
 
@@ -395,6 +393,13 @@ class StakingStats {
     const mcr = this.nexusContractLoader.instance('MC');
     const tokenPrice = mcr.calculateTokenPrice(hex(currency));
     return tokenPrice;
+  }
+
+  async getBlock (blockNumber) {
+    if (!this.blockCache[blockNumber]) {
+      this.blockCache[blockNumber] = await this.web3.eth.getBlock(blockNumber);
+    }
+    return this.blockCache[blockNumber];
   }
 }
 

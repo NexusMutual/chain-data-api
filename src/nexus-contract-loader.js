@@ -3,9 +3,20 @@ const log = require('./log');
 
 const { setupLoader } = require('@openzeppelin/contract-loader');
 
+const CHAIN = {
+  1: 'mainnet',
+  3: 'ropsten',
+  4: 'rinkeby',
+  42: 'kovan',
+}
+
 class NexusContractLoader {
 
-  constructor (chain, versionDataURL, web3) {
+  constructor (chainId, versionDataURL, web3) {
+    const chain = CHAIN[chainId];
+    if (!chain) {
+      throw new Error(`Unknown chainId: ${chainId}`);
+    }
     this.chain = chain;
     this.versionDataURL = versionDataURL;
     this.web3 = web3;

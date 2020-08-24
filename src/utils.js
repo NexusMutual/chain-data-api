@@ -55,9 +55,9 @@ async function getLastProcessedBlock (model) {
 }
 
 function addDays (date, days) {
-  var date = new Date(date.valueOf());
-  date.setDate(date.getDate() + days);
-  return date;
+  const newDate = new Date(date.valueOf());
+  newDate.setDate(date.getDate() + days);
+  return newDate;
 }
 
 function datesRange (startDate, endDate) {
