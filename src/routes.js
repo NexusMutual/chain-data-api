@@ -25,17 +25,7 @@ module.exports = (stakingStats) => {
     next();
   });
 
-  const whitelist = ['https://nexusmutual.io'];
-  const corsOptions = {
-    origin: (origin, callback) => {
-      if (whitelist.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-  };
-  app.use(cors(corsOptions));
+  app.use(cors({ origin: /\.nexusmutual\.io$/ }));
 
   app.get('/v1/staking/global-stats', asyncRoute(async (req, res) => {
 
