@@ -281,7 +281,7 @@ class StakingStats {
 
   async syncStakerSnapshotsForBlock (allStakers, blockNumber, date) {
 
-    const chunkSize = 50;
+    const chunkSize = 25;
     const chunks = chunk(allStakers, chunkSize);
     log.info(`To be processed in ${chunks.length} chunks of max size ${chunkSize}`);
 
