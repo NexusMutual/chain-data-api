@@ -37,7 +37,7 @@ module.exports = (stakingStats) => {
   };
   app.use(cors(corsOptions));
 
-  app.get('/staking/global-stats', asyncRoute(async (req, res) => {
+  app.get('/v1/staking/global-stats', asyncRoute(async (req, res) => {
 
     const { totalStaked, coverPurchased, totalRewards, averageReturns, createdAt } = await stakingStats.getGlobalStats();
     res.json({
@@ -49,7 +49,7 @@ module.exports = (stakingStats) => {
     });
   }));
 
-  app.get('/staking/staker-stats/:staker', asyncRoute(async (req, res) => {
+  app.get('/v1/staking/staker-stats/:staker', asyncRoute(async (req, res) => {
     const staker = req.params.staker;
     log.info(`Fetching stats for staker ${staker}`);
     if (!isValidEthereumAddress(staker)) {
@@ -65,7 +65,7 @@ module.exports = (stakingStats) => {
     });
   }));
 
-  app.get('/staking/contract-stats/:contract', asyncRoute(async (req, res) => {
+  app.get('/v1/staking/contract-stats/:contract', asyncRoute(async (req, res) => {
     const contract = req.params.contract;
     log.info(`Fetching stats for contract ${contract}`);
     if (!isValidEthereumAddress(contract)) {
