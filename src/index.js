@@ -35,7 +35,7 @@ async function init () {
   const etherscanAPIKey = getEnv('ETHERSCAN_API_KEY');
 
   log.info('Connecting to database..');
-  const opts = { useNewUrlParser: true, useUnifiedTopology: true };
+  const opts = { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true };
   await mongoose.connect(mongoURL, opts);
 
   log.info(`Connecting to node at ${providerURL}..`);
