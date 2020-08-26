@@ -2,6 +2,7 @@ const Web3 = require('web3');
 const { toBN } = new Web3().utils;
 const log = require('./log');
 const fetch = require('node-fetch');
+const NodeCache = require('node-cache');
 const { hex, getLastProcessedBlock, flattenEvent, sleep, to } = require('./utils');
 const {
   Stake,
@@ -12,6 +13,7 @@ const {
   WithdrawnReward,
 } = require('./models');
 const { chunk, insertManyIgnoreDuplicates, datesRange, addDays, dayUTCFloor } = require('./utils');
+const { getWhitelist } = require('./contract-whitelist');
 
 const BN = new Web3().utils.BN;
 
@@ -25,6 +27,7 @@ class StakingStats {
     this.annualizedReturnsDaysInterval = annualizedReturnsDaysInterval;
     this.etherscanAPIKey = etherscanAPIKey;
     this.blockCache = {};
+    this.contractStakeCache = new NodeCache({ stdTTL: 15, checkperiod: 60 });
   }
 
   async getGlobalStats () {
@@ -93,6 +96,30 @@ class StakingStats {
 
     const apy = (1 + rewardSum / averageStake) ^ (365 / periodInDays) - 1;
     return { annualizedReturns: apy };
+  }
+
+  async getAllContractStats () {
+    const whitelist = await getWhitelist();
+    const contracts = Object.keys(whitelist);
+
+    log.info(`Fetching contract stats for ${contracts.length} contracts.`);
+
+    const chunkSize = 50;
+    const chunks = chunk(contracts, chunkSize);
+    log.info(`To be processed in ${chunks.length} chunks of max size ${chunkSize}`);
+
+    const stats = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const contractStats = await Promise.all(chunk.map(async (contract) => {
+        const stats = await this.getContractStats(contract);
+        return { ...stats, contractAddress: contract };
+      }));
+
+      stats.push(...contractStats);
+    }
+
+    return stats;
   }
 
   async syncStakingStats () {
@@ -165,6 +192,7 @@ class StakingStats {
     await Promise.all(flattenedRewardedEvents.map(async event => {
       const block = await this.getBlock(event.blockNumber);
       event.timestamp = block.timestamp;
+      event.contractAddress = event.contractAddress.toLowerCase();
     }));
 
     await insertManyIgnoreDuplicates(Reward, flattenedRewardedEvents);
@@ -369,8 +397,16 @@ class StakingStats {
   }
 
   async getContractStake (contractAddress) {
+
+    const cachedContractStake = this.contractStakeCache.get(contractAddress);
+    if (cachedContractStake) {
+      return cachedContractStake;
+    }
+
     const pooledStaking = this.nexusContractLoader.instance('PS');
     const stake = await pooledStaking.contractStake(contractAddress);
+
+    this.contractStakeCache.set(contractAddress, stake);
     return stake;
   }
 

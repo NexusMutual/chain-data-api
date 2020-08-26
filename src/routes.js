@@ -71,6 +71,13 @@ module.exports = (stakingStats) => {
     });
   }));
 
+  app.get('/v1/staking/contract-stats', asyncRoute(async (req, res) => {
+    log.info(`Fetching stats for all contracts.`);
+
+    const allContractStats = await stakingStats.getAllContractStats();
+    res.json(allContractStats);
+  }));
+
   return app;
 };
 
