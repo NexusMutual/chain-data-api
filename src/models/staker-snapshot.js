@@ -9,6 +9,6 @@ const stakerSnapshot = new mongoose.Schema({
   blockNumber: { type: Number },
 });
 
-stakerSnapshot.index({ address: 1, timestamp: 1 }, { unique: true });
+stakerSnapshot.index({ stakerAddress: 1, timestamp: 1 }, { unique: true });
 
 module.exports = mongoose.model('StakerSnapshot', stakerSnapshot);

@@ -13,5 +13,6 @@ const withdrawnRewardSchema = new mongoose.Schema({
 });
 
 withdrawnRewardSchema.index({ staker: 1 });
+withdrawnRewardSchema.index({ transactionHash: 1, logIndex: 1 }, { unique: true });
 
 module.exports = mongoose.model('WithdrawnReward', withdrawnRewardSchema);

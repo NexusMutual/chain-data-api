@@ -255,12 +255,17 @@ class StakingStats {
 
     const latestStakerSnapshot = await StakerSnapshot.findOne().sort({ timestamp: -1 });
 
-    const startDate = latestStakerSnapshot ? new Date(latestStakerSnapshot.timestamp) : STAKING_START_DATE;
+    const startDate = latestStakerSnapshot ? addDays(new Date(latestStakerSnapshot.timestamp), 1) : STAKING_START_DATE;
     const endDate = dayUTCFloor(new Date());
 
     log.info(JSON.stringify({ startDate, endDate }));
     const dates = datesRange(startDate, endDate);
     log.info(`Processing range: ${JSON.stringify(dates)}`);
+
+    if (dates.length === 0) {
+      log.info(`No new dates to process. Skipping.`);
+      return;
+    }
 
     let blockNumbersByTimestamp = {};
     if (dates.length > 1) {
@@ -281,7 +286,7 @@ class StakingStats {
 
   async syncStakerSnapshotsForBlock (allStakers, blockNumber, date) {
 
-    const chunkSize = 10;
+    const chunkSize = 50;
     const chunks = chunk(allStakers, chunkSize);
     log.info(`To be processed in ${chunks.length} chunks of max size ${chunkSize}`);
 
