@@ -2,7 +2,7 @@ const Web3 = require('web3');
 const { toBN } = new Web3().utils;
 const log = require('./log');
 const fetch = require('node-fetch');
-const { hex, getLastProcessedBlock, flattenEvent, sleep } = require('./utils');
+const { hex, getLastProcessedBlock, flattenEvent, sleep, to } = require('./utils');
 const {
   Stake,
   Reward,
@@ -297,7 +297,7 @@ class StakingStats {
       const chunk = chunks[i];
       log.info(`Processing staker chunk of size ${chunk.length} for ${blockNumber} and date ${date}`);
 
-      const [stakerSnapshot, error ] = await to(Promise.all(chunk.map(async staker => {
+      const [stakerSnapshots, error] = await to(Promise.all(chunk.map(async staker => {
         const [deposit, reward] = await Promise.all([
           pooledStaking.methods.stakerDeposit(staker).call(undefined, blockNumber),
           pooledStaking.methods.stakerReward(staker).call(undefined, blockNumber),
@@ -307,13 +307,13 @@ class StakingStats {
 
       if (error) {
         const sleepTime = 10000;
-        log.error(`Failed to fetch chunk with: ${error.stack}. Sleeping for ${sleepTime} and retrying the chunk.`)
+        log.error(`Failed to fetch chunk with: ${error.stack}. Sleeping for ${sleepTime} and retrying the chunk.`);
         await sleep(sleepTime);
         i--;
         continue;
       }
 
-      allStakerSnapshots.push(...stakerSnapshot);
+      allStakerSnapshots.push(...stakerSnapshots);
     }
     const today = dayUTCFloor(date);
     const createdAt = new Date();
