@@ -292,15 +292,27 @@ class StakingStats {
 
     const pooledStaking = this.nexusContractLoader.web3Instance('PS');
     const allStakerSnapshots = [];
-    for (const chunk of chunks) {
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
       log.info(`Processing staker chunk of size ${chunk.length} for ${blockNumber} and date ${date}`);
-      const stakerSnapshot = await Promise.all(chunk.map(async staker => {
+
+      const [stakerSnapshot, error ] = await to(Promise.all(chunk.map(async staker => {
         const [deposit, reward] = await Promise.all([
           pooledStaking.methods.stakerDeposit(staker).call(undefined, blockNumber),
           pooledStaking.methods.stakerReward(staker).call(undefined, blockNumber),
         ]);
         return { staker, deposit, reward };
-      }));
+      })));
+
+      if (error) {
+        const sleepTime = 10000;
+        log.error(`Failed to fetch chunk with: ${error.stack}. Sleeping for ${sleepTime} and retrying the chunk.`)
+        await sleep(sleepTime);
+        i--;
+        continue;
+      }
+
       allStakerSnapshots.push(...stakerSnapshot);
     }
     const today = dayUTCFloor(date);
