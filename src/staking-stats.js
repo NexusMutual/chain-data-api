@@ -45,7 +45,8 @@ class StakingStats {
     return stats;
   }
 
-  async getStakerStats (staker) {
+  async getStakerStats (rawStaker) {
+    const staker = rawStaker.toLowerCase();
     const annualizedDaysInterval = this.annualizedReturnsDaysInterval;
     const pooledStaking = this.nexusContractLoader.instance('PS');
     const withdrawnRewards = await WithdrawnReward.find({ staker });
@@ -71,7 +72,8 @@ class StakingStats {
     return { totalRewards, annualizedReturns };
   }
 
-  async getContractStats (contractAddress) {
+  async getContractStats (rawContractAddress) {
+    const contractAddress = rawContractAddress.toLowerCase();
     const rewards = await Reward.find({ contractAddress });
 
     const MIN_COVERS_COUNT = 5;
@@ -209,6 +211,9 @@ class StakingStats {
     const newStakedEvents = await this.getStakedEvents(fromBlock);
     log.info(`Detected ${newStakedEvents.length} new Staked events.`);
     const flattenedStakedEvents = newStakedEvents.map(flattenEvent);
+    flattenedStakedEvents.forEach(e => {
+      e.contractAddress = e.contractAddress.toLowerCase();
+    });
     await insertManyIgnoreDuplicates(Stake, flattenedStakedEvents);
 
     const stakedEvents = await Stake.find();
@@ -234,7 +239,7 @@ class StakingStats {
     const covers = newCoverDetailsEvents.map(flattenEvent).map(event => {
       return {
         coverId: event.cid,
-        contractAddress: event.scAdd,
+        contractAddress: event.scAdd.toLowerCase(),
         sumAssured: event.sumAssured,
         expiry: event.expiry,
         premium: event.premium,
@@ -266,6 +271,9 @@ class StakingStats {
       event.timestamp = block.timestamp;
     }));
     const flattenedEvents = rewardWithdrawnEvents.map(flattenEvent);
+    flattenedEvents.forEach(e => {
+      e.staker = e.staker.toLowerCase();
+    });
     log.info(`Detected ${rewardWithdrawnEvents.length} new RewardWithdrawn events.`);
     await insertManyIgnoreDuplicates(WithdrawnReward, flattenedEvents);
   }
@@ -347,7 +355,7 @@ class StakingStats {
     const createdAt = new Date();
     const dailyStakerSnapshotRecords = allStakerSnapshots.map(({ staker, deposit, reward }) => {
       return {
-        stakerAddress: staker,
+        stakerAddress: staker.toLowerCase(),
         deposit: deposit.toString(),
         reward: reward.toString(),
         timestamp: today.getTime(),
