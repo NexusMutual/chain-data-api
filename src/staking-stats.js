@@ -96,7 +96,7 @@ class StakingStats {
     const rewardSumBN = rewards.map(reward => new BN(reward.amount)).reduce((a, b) => a.add(b), new BN('0'));
     const rewardSum = parseInt(rewardSumBN.toString());
 
-    const apy = (1 + rewardSum / averageStake) ^ (365 / periodInDays) - 1;
+    const apy = (1 + rewardSum / averageStake) ** (365 / periodInDays) - 1;
     return { annualizedReturns: apy };
   }
 
