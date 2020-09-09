@@ -19,6 +19,7 @@ const BN = new Web3().utils.BN;
 
 const STAKING_START_DATE = dayUTCFloor(new Date('06-31-2020'));
 const DAY_IN_SECONDS = 60 * 60 * 24;
+const MIN_CONTRACT_RETURNS_ANNUALIZATION_DAYS = 7;
 
 class StakingStats {
   constructor (nexusContractLoader, web3, annualizedReturnsDaysInterval, etherscanAPIKey) {
@@ -76,7 +77,7 @@ class StakingStats {
     const contractAddress = rawContractAddress.toLowerCase();
     const rewards = await Reward.find({ contractAddress });
 
-    const MIN_COVERS_COUNT = 5;
+    const MIN_COVERS_COUNT = 2;
     if (rewards.length < MIN_COVERS_COUNT) {
       return {
         error: 'Not enough historical info.',
@@ -89,7 +90,7 @@ class StakingStats {
     const endTimestamp = Math.round(new Date().getTime() / 1000);
     const periodInSeconds = endTimestamp - startTimestamp;
 
-    const periodInDays = periodInSeconds / DAY_IN_SECONDS;
+    const periodInDays = Math.max(periodInSeconds / DAY_IN_SECONDS, MIN_CONTRACT_RETURNS_ANNUALIZATION_DAYS);
     const startingStake = parseInt(rewards.find(r => r.timestamp === startTimestamp).contractStake);
 
     const averageStake = (parseInt(currentStake.toString()) + startingStake) / 2;
