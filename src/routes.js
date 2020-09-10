@@ -113,6 +113,6 @@ module.exports = (stakingStats) => {
 };
 
 function isValidEthereumAddress (address) {
-  const ETHEREUM_ADDRESS_REGEX = /^0(x|X)[a-fA-F0-9]{40}$/;
+  const ETHEREUM_ADDRESS_REGEX = /^0x[a-f0-9]{40}$/i;
   return address && address.length === 42 && address.match(ETHEREUM_ADDRESS_REGEX);
 }
