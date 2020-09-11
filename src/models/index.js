@@ -1,4 +1,4 @@
-const ApiKey = require('./apiKey');
+const ApiKey = require('./api-key');
 const Stake = require('./stake');
 const StakingStatsSnapshot = require('./staking-stats-snapshot');
 const Reward = require('./reward');
