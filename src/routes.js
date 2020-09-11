@@ -41,7 +41,7 @@ module.exports = (stakingStats) => {
       message: 'Origin not allowed. Contact us for an API key',
     });
 
-    if (/\.nexusmutual\.io$/.test(origin)) {
+    if (/(\.nexusmutual\.io|localhost:3000)$/.test(origin)) {
       return allow();
     }
 
