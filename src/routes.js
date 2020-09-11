@@ -1,9 +1,9 @@
 const express = require('express');
 const log = require('./log');
-const cors = require('cors');
+const { ApiKey } = require('./models');
 
-const asyncRoute = route => (req, res) => {
-  route(req, res).catch(e => {
+const asyncRoute = route => (req, res, ...rest) => {
+  route(req, res, ...rest).catch(e => {
     log.error(`Route error: ${e.stack}`);
     res.status(500).send({
       error: true,
@@ -25,7 +25,38 @@ module.exports = (stakingStats) => {
     next();
   });
 
-  app.use(cors({ origin: /\.nexusmutual\.io$/ }));
+  app.use(asyncRoute(async (req, res, next) => {
+
+    const origin = req.get('origin');
+    const apiKey = req.headers['x-api-key'];
+
+    const allow = () => {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Headers', 'x-api-key');
+      next();
+    };
+
+    const deny = () => res.status(403).send({
+      error: true,
+      message: 'Origin not allowed. Contact us for an API key',
+    });
+
+    if (/\.nexusmutual\.io$/.test(origin)) {
+      return allow();
+    }
+
+    if (!apiKey) { // null, undefined, etc
+      return deny();
+    }
+
+    const domainKey = await ApiKey.findOne({ origin, apiKey });
+
+    if (domainKey === null) {
+      return deny();
+    }
+
+    allow();
+  }));
 
   app.get('/v1/staking/global-stats', asyncRoute(async (req, res) => {
 
@@ -82,6 +113,6 @@ module.exports = (stakingStats) => {
 };
 
 function isValidEthereumAddress (address) {
-  const ETHEREUM_ADDRESS_REGEX = /^0(x|X)[a-fA-F0-9]{40}$/;
+  const ETHEREUM_ADDRESS_REGEX = /^0x[a-f0-9]{40}$/i;
   return address && address.length === 42 && address.match(ETHEREUM_ADDRESS_REGEX);
 }
