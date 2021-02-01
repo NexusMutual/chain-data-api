@@ -15,6 +15,8 @@ const {
 const { chunk, insertManyIgnoreDuplicates, datesRange, addDays, dayUTCFloor } = require('./utils');
 const { getWhitelist } = require('./contract-whitelist');
 
+const DAI = '0x6b175474e89094c44da98b954eedeac495271d0f';
+
 const BN = new Web3().utils.BN;
 
 const STAKING_START_DATE = dayUTCFloor(new Date('06-31-2020'));
@@ -34,7 +36,7 @@ class StakingStats {
   async getGlobalStats () {
 
     const globalAggregatedStats = await StakingStatsSnapshot.findOne().sort({ blockNumber: -1 });
-    const tokenPrice = await this.getCurrentTokenPrice('DAI');
+    const tokenPrice = await this.getCurrentTokenPrice(DAI);
     const stats = {
       totalStaked: getUSDValue(new BN(globalAggregatedStats.totalStaked), tokenPrice),
       coverPurchased: getUSDValue(new BN(globalAggregatedStats.coverPurchased), tokenPrice),
@@ -451,9 +453,9 @@ class StakingStats {
     return coverDetailsEvents;
   }
 
-  async getCurrentTokenPrice (currency) {
-    const mcr = this.nexusContractLoader.instance('MC');
-    const tokenPrice = mcr.calculateTokenPrice(hex(currency));
+  async getCurrentTokenPrice (asset) {
+    const pool = this.nexusContractLoader.instance('P1');
+    const tokenPrice = await pool.getTokenPrice(asset);
     return tokenPrice;
   }
 
