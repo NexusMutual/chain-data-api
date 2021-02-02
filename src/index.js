@@ -28,7 +28,6 @@ async function init () {
   const providerURL = getEnv('PROVIDER_URL');
   const versionDataURL = getEnv('VERSION_DATA_URL');
   const globalStatsSyncInterval = parseInt(getEnv('GLOBAL_STATS_SYNC_INTERVAL'));
-  const stakerSnapshotsSyncInterval = parseInt(getEnv('STAKER_SNAPSHOTS_SYNC_INTERVAL'));
   const syncFailureRetryInterval = parseInt(getEnv('SYNC_FAILURE_INTERVAL'));
   const annualizedDaysInterval = parseInt(getEnv('ANNUALIZED_DAYS_INTERVAL'));
   const mongoURL = getEnv('MONGO_URL', 'mainnet');
@@ -68,15 +67,7 @@ async function init () {
       syncFailureRetryInterval,
     ));
 
-  const backgroundStakerSnapshotsSync = log.runWithContinuationId(
-    'staker-snapshots-sync',
-    () => runForever(
-      () => chainDataAggregator.syncStakerSnapshots(),
-      stakerSnapshotsSyncInterval,
-      syncFailureRetryInterval,
-    ));
-
-  await Promise.all([backgroundWithdrawnRewardSync, backgroundStakingStatsSync, backgroundStakerSnapshotsSync]);
+  await Promise.all([backgroundWithdrawnRewardSync, backgroundStakingStatsSync]);
 }
 
 init()

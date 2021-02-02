@@ -8,7 +8,6 @@ const {
   Stake,
   Reward,
   Cover,
-  StakerSnapshot,
   StakingStatsSnapshot,
   WithdrawnReward,
 } = require('./models');
@@ -50,7 +49,6 @@ class StakingStats {
 
   async getStakerStats (rawStaker) {
     const staker = rawStaker.toLowerCase();
-    const annualizedDaysInterval = this.annualizedReturnsDaysInterval;
     const pooledStaking = this.nexusContractLoader.instance('PS');
     const withdrawnRewards = await WithdrawnReward.find({ staker });
 
@@ -59,20 +57,7 @@ class StakingStats {
     const currentReward = await pooledStaking.stakerReward(staker);
     const totalRewards = totalWithdrawnAmounts.add(currentReward).toString();
 
-    const currentDay = dayUTCFloor(new Date());
-    const startTimestamp = addDays(currentDay, -this.annualizedReturnsDaysInterval).getTime();
-    const dailyStakerSnapshots = await StakerSnapshot
-      .find({ address: staker, timestamp: { $gte: startTimestamp } })
-      .sort({ timestamp: -1 });
-
-    let annualizedReturns;
-    if (dailyStakerSnapshots.length >= this.annualizedReturnsDaysInterval) {
-      annualizedReturns = stakerAnnualizedReturns(dailyStakerSnapshots, currentReward, withdrawnRewards, annualizedDaysInterval);
-    } else {
-      log.warn(`Insufficient ${dailyStakerSnapshots.length} daily staker snapshots to compute annualized returns for member ${staker}. Required: ${this.annualizedReturnsDaysInterval}`);
-    }
-
-    return { totalRewards, annualizedReturns };
+    return { totalRewards };
   }
 
   async getContractStats (rawContractAddress) {
@@ -165,23 +150,8 @@ class StakingStats {
     const latestRewards = latestRewardedEvents.map(event => new BN(event.amount));
     const totalLatestReward = latestRewards.reduce((a, b) => a.add(b), new BN('0'));
 
-    const latest = await StakerSnapshot
-      .findOne()
-      .sort({ timestamp: -1 });
-
-    if (!latest) {
-      return undefined;
-    }
-
-    const latestTimestamp = latest.timestamp;
-    const dailyStakerSnapshotForLastDay = await StakerSnapshot
-      .find()
-      .sort({ timestamp: -1 })
-      .where('timestamp').eq(latestTimestamp);
-
-    const currentGlobalDeposit = dailyStakerSnapshotForLastDay
-      .map(data => new BN(data.deposit))
-      .reduce((a, b) => a.add(b), new BN('0'));
+    const pooledStakingNXMBalance = await this.getPooledStakingXMBalance();
+    const currentGlobalDeposit = pooledStakingNXMBalance.sub(totalLatestReward);
 
     const averageReturns = parseInt(totalLatestReward.toString()) / parseInt(currentGlobalDeposit.toString());
     return averageReturns;
@@ -281,132 +251,6 @@ class StakingStats {
     await insertManyIgnoreDuplicates(WithdrawnReward, flattenedEvents);
   }
 
-  async syncStakerSnapshots () {
-    log.info(`Syncing daily staker deposits..`);
-    const allStakedEvents = await Stake.find();
-    if (allStakedEvents.length === 0) {
-      log.info(`No stakes recorded. Skipping syncing staker snapshot sync until that is completed.`);
-      return;
-    }
-
-    const allStakers = Array.from(new Set(allStakedEvents.map(event => event.staker)));
-    log.info(`There are ${allStakers.length} stakers to sync.`);
-
-    const latestStakerSnapshot = await StakerSnapshot.findOne().sort({ timestamp: -1 });
-
-    const startDate = latestStakerSnapshot ? addDays(new Date(latestStakerSnapshot.timestamp), 1) : STAKING_START_DATE;
-    const endDate = dayUTCFloor(new Date());
-
-    log.info(JSON.stringify({ startDate, endDate }));
-    const dates = datesRange(startDate, endDate);
-    log.info(`Processing range: ${JSON.stringify(dates)}`);
-
-    if (dates.length === 0) {
-      log.info(`No new dates to process. Skipping.`);
-      return;
-    }
-
-    let blockNumbersByTimestamp = {};
-    if (dates.length > 1) {
-      log.info(`Historical data is missing for ${dates.length - 1} days. Fetching past block numbers to process.`);
-      blockNumbersByTimestamp = await this.getBlockNumbersByTimestamps(dates.map(d => d.getTime()));
-    }
-
-    const latestBlockNumber = await this.web3.eth.getBlockNumber();
-    log.info(`For today ${endDate} overriding with the latest block number: ${latestBlockNumber}`);
-    blockNumbersByTimestamp[endDate.getTime()] = latestBlockNumber;
-
-    for (const date of dates) {
-      const blockNumber = blockNumbersByTimestamp[date.getTime()];
-      log.info(`Syncing for date ${date} and block ${blockNumber}`);
-      await this.syncStakerSnapshotsForBlock(allStakers, blockNumber, date);
-    }
-  }
-
-  async syncStakerSnapshotsForBlock (allStakers, blockNumber, date) {
-
-    const chunkSize = 50;
-    const chunks = chunk(allStakers, chunkSize);
-    log.info(`To be processed in ${chunks.length} chunks of max size ${chunkSize}`);
-
-    const pooledStaking = this.nexusContractLoader.web3Instance('PS');
-    const allStakerSnapshots = [];
-
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      log.info(`Processing staker chunk of size ${chunk.length} for ${blockNumber} and date ${date}`);
-
-      const [stakerSnapshots, error] = await to(Promise.all(chunk.map(async staker => {
-        const [deposit, reward] = await Promise.all([
-          pooledStaking.methods.stakerDeposit(staker).call(undefined, blockNumber),
-          pooledStaking.methods.stakerReward(staker).call(undefined, blockNumber),
-        ]);
-        return { staker, deposit, reward };
-      })));
-
-      if (error) {
-        const sleepTime = 10000;
-        log.error(`Failed to fetch chunk with: ${error.stack}. Sleeping for ${sleepTime} and retrying the chunk.`);
-        await sleep(sleepTime);
-        i--;
-        continue;
-      }
-
-      allStakerSnapshots.push(...stakerSnapshots);
-    }
-    const today = dayUTCFloor(date);
-    const createdAt = new Date();
-    const dailyStakerSnapshotRecords = allStakerSnapshots.map(({ staker, deposit, reward }) => {
-      return {
-        stakerAddress: staker.toLowerCase(),
-        deposit: deposit.toString(),
-        reward: reward.toString(),
-        timestamp: today.getTime(),
-        blockNumber,
-        createdAt: createdAt };
-    });
-
-    log.info(`Storing ${dailyStakerSnapshotRecords.length} daily staker deposits.`);
-    await insertManyIgnoreDuplicates(StakerSnapshot, dailyStakerSnapshotRecords);
-  }
-
-  async getBlockNumbersByTimestamps (timestamps) {
-
-    const blockNumberByTimestamp = {};
-    const ETHERSCAN_REQ_PER_BURST = 5;
-    const chunks = chunk(timestamps, ETHERSCAN_REQ_PER_BURST);
-
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      log.info(`Fetching block numbers for timestamps: ${JSON.stringify(chunk)}`);
-
-      try {
-        await Promise.all(chunk.map(async timestamp => {
-          const blockNumber = await this.getBlockNumberByTimestamp(timestamp);
-          blockNumberByTimestamp[timestamp] = blockNumber;
-        }));
-      } catch (e) {
-        const backoffTime = 10000;
-        log.error(`Failed to fetch block numbers: ${e.stack}. Sleeping for ${backoffTime} and retrying same chunk.`);
-        await sleep(backoffTime);
-        i--;
-      }
-
-      await sleep(1000);
-    }
-    return blockNumberByTimestamp;
-  }
-
-  async getBlockNumberByTimestamp (timestampInMillis) {
-    const timestamp = Math.floor(timestampInMillis / 1000);
-    const url = `https://api.etherscan.io/api?module=block&action=getblocknobytime&timestamp=${timestamp}&closest=after&apikey=${this.etherscanAPIKey}`;
-    const { result, message } = await fetch(url).then(res => res.json());
-    if (message !== 'OK') {
-      throw new Error(`${message}: ${result}`);
-    }
-    return parseInt(result);
-  }
-
   async getContractStake (contractAddress) {
 
     const cachedContractStake = this.contractStakeCache.get(contractAddress);
@@ -459,54 +303,19 @@ class StakingStats {
     return tokenPrice;
   }
 
+  async getPooledStakingXMBalance() {
+    const pooledStaking = this.nexusContractLoader.instance('PS');
+    const nxm = this.nexusContractLoader.instance('NXMTOKEN');
+    const nxmBalance = await nxm.balanceOf(pooledStaking.address);
+    return nxmBalance;
+  }
+
   async getBlock (blockNumber) {
     if (!this.blockCache[blockNumber]) {
       this.blockCache[blockNumber] = await this.web3.eth.getBlock(blockNumber);
     }
     return this.blockCache[blockNumber];
   }
-}
-
-/**
- * Uses the staker data snapshots for the last annualizedDaysInterval days to compute
- * the rewards gained by the user until the present time by calculating the difference between the snapshot
- * reward value at the start of the interval, the current stored reward value and adding to that all rewardWithdrawn
- * values in the time interval.
- *
- * Computes the average deposit from all the deposit values in latestStakerSnapshots.
- *
- * @param latestStakerSnapshots
- * @param currentReward
- * @param rewardWithdrawnEvents
- * @param annualizedDaysInterval
- * @returns {*}
- */
-function stakerAnnualizedReturns (latestStakerSnapshots, currentReward, rewardWithdrawnEvents, annualizedDaysInterval) {
-
-  if (latestStakerSnapshots.length === 0) {
-    return undefined;
-  }
-
-  const firstStakerSnapshot = latestStakerSnapshots[0];
-  const startTime = firstStakerSnapshot.createdAt.getTime();
-  const rewardsPostStartTime = rewardWithdrawnEvents
-    .filter(rewardEvent => rewardEvent.timestamp * 1000 >= startTime)
-    .map(event => new BN(event.returnValues.amount));
-
-  const storedRewardDifference = currentReward.sub(new BN(firstStakerSnapshot.reward));
-  const sumOfRewardsPerInterval = rewardsPostStartTime.reduce((a, b) => a.add(b), storedRewardDifference);
-  const averageDeposit = latestStakerSnapshots
-    .map(stakerSnapshot => new BN(stakerSnapshot.deposit))
-    .reduce((a, b) => a.add(b), new BN('0')).div(new BN(latestStakerSnapshots.length));
-
-  const exponent = 365 / annualizedDaysInterval;
-
-  /**
-   *  (sumOfRewardsPerInterval / averageDeposit + 1) ^ ( 365 / annualizedDaysInterval) -1;
-   * @type {number}
-   */
-  const annualizedReturns = (parseInt(sumOfRewardsPerInterval.toString()) / parseInt(averageDeposit.toString()) + 1) ** exponent - 1;
-  return annualizedReturns;
 }
 
 /**
