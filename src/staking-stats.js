@@ -8,7 +8,6 @@ const {
   Stake,
   Reward,
   Cover,
-  StakerSnapshot,
   StakingStatsSnapshot,
   WithdrawnReward,
 } = require('./models');
