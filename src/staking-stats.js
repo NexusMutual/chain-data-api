@@ -117,7 +117,7 @@ class StakingStats {
   async syncStakingStats () {
     log.info(`Syncing StakingStatsSnapshot..`);
     const latestAggregatedStats = await StakingStatsSnapshot.findOne().sort({ blockNumber: -1 });
-    const fromBlock = latestAggregatedStats ? latestAggregatedStats.blockNumber + 1 : 11468726;
+    const fromBlock = latestAggregatedStats ? latestAggregatedStats.blockNumber + 1 : 0;
     log.info(`Computing global aggregated stats from block ${fromBlock}`);
     const blockNumber = await this.web3.eth.getBlockNumber();
     log.info(`Latest block being processed: ${blockNumber}`);
